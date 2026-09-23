@@ -1,0 +1,13 @@
+{
+    "$schema": "https://apify.com/schemas/v1/actor.ide.json",
+    "actorSpecification": 1,
+    "name": "workdey-match-agent",
+    "title": "WorkDey Match Agent",
+    "description": "Reads a job seeker's profile and CV, matches new posts from public job boards against it, and drafts a ready reply, cover letter and CV tips for the best fits.",
+    "version": "0.0",
+    "buildTag": "latest",
+    "meta": {
+        "templateId": "ts-crawlee-cheerio"
+    },
+    "dockerfile": "../Dockerfile"
+}
