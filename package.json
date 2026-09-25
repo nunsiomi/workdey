@@ -1,14 +1,15 @@
 {
-	"name": "workdey-match-agent",
+	"name": "workdey-career-agent",
 	"version": "0.0.1",
 	"type": "module",
-	"description": "An AI agent, built as an Apify Actor, that watches job boards for a job seeker, picks the jobs that truly fit her profile, and drafts her reply, cover letter and CV tips.",
+	"description": "This is a boilerplate of an Apify Actor.",
 	"engines": {
 		"node": ">=22"
 	},
 	"dependencies": {
+		"@crawlee/cheerio": "^3.15.3",
 		"apify": "^3.7.0",
-		"@crawlee/cheerio": "^3.15.3"
+		"groq-sdk": "^1.6.0"
 	},
 	"devDependencies": {
 		"@apify/eslint-config": "^2.0.0",
@@ -34,6 +35,6 @@
 		"format:check": "prettier --check .",
 		"test": "vitest run"
 	},
-	"author": "WorkDey Match Agent team",
+	"author": "It's not you it's me",
 	"license": "ISC"
 }

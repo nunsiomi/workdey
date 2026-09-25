@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WorkDey: your profile</title>
+<style>
+:root {
+  --bg: #f3f4f6; --ink: #0d0f12; --soft: #565c66; --line: #dfe2e7;
+  --card: #fff; --dim: #f7f8f9; --pink: #ff80b5; --magenta: #c2185b; --teal: #0f7a63; --teal-bg: #d9f1ea; --red: #b3261e;
+  --sans: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, Consolas, monospace;
+  --hand: "Segoe Print", "Bradley Hand", "Chalkboard SE", "Comic Sans MS", cursive;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 16px; line-height: 1.5; }
+a { color: inherit; }
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--magenta); outline-offset: 2px; }
+.boot { padding: 40px 16px; text-align: center; color: var(--soft); }
+
+.bar { background: var(--ink); color: #fff; }
+.bar-in { max-width: 1100px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.05rem; text-decoration: none; }
+.mark { width: 28px; height: 28px; border-radius: 8px; background: var(--pink); display: grid; place-items: center; }
+.who { display: flex; align-items: center; gap: 14px; font-size: .9rem; color: #c9ced6; }
+.linkbtn { background: none; border: 0; padding: 0; color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+
+.page { max-width: 1100px; margin: 0 auto; padding: 32px 20px 80px; }
+h1 { margin: 0; font-size: clamp(2.4rem, 8vw, 3.8rem); line-height: 1; font-weight: 800; letter-spacing: -0.05em; }
+.sub { margin: 12px 0 0; color: var(--soft); max-width: 36em; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1.5px solid var(--ink); border-radius: 999px; padding: 12px 22px; font-weight: 700; text-decoration: none; background: #fff; transition: background .15s ease; }
+.btn:hover { background: #f1f2f4; }
+.btn.pink { background: var(--pink); }
+.btn.pink:hover { background: #ff6aa8; }
+.btn.block { width: 100%; }
+.btn.done { background: var(--teal-bg); border-color: var(--teal); color: var(--teal); }
+
+/* sign in */
+.signin { display: grid; grid-template-columns: minmax(0, 1fr); gap: 40px; align-items: center; padding-top: 24px; }
+.signin .note { font-family: var(--hand); color: var(--magenta); margin: 24px 0 0; max-width: 22em; font-size: 1.05rem; line-height: 1.3; }
+.panel { background: var(--card); border: 1.5px solid var(--ink); border-radius: 16px; box-shadow: 7px 7px 0 var(--ink); padding: 26px; }
+.panel h2 { margin: 0 0 18px; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.03em; }
+.small { font-size: .85rem; color: var(--soft); margin: 14px 0 0; }
+
+/* form */
+.field { display: grid; gap: 6px; margin-bottom: 16px; }
+.field > label, .lab { font-weight: 700; font-size: .92rem; }
+.lab small, .field label small { font-weight: 400; color: var(--soft); margin-left: 6px; }
+.in { width: 100%; background: #fff; border: 1.5px solid #c9ced6; border-radius: 10px; padding: 11px 13px; }
+.in:focus { border-color: var(--ink); outline: none; box-shadow: 0 0 0 3px rgba(255,128,181,.5); }
+.in.bad { border-color: var(--red); }
+textarea.in { min-height: 200px; font-family: var(--mono); font-size: .85rem; line-height: 1.55; resize: vertical; background: var(--dim); }
+.err { color: var(--red); font-size: .85rem; margin: 2px 0 0; }
+.two { display: grid; gap: 0 16px; grid-template-columns: minmax(0, 1fr); }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; margin-top: 28px; align-items: start; }
+.stack { display: grid; gap: 20px; min-width: 0; }
+.card { background: var(--card); border: 1.5px solid var(--line); border-radius: 16px; padding: 22px; }
+
+.tags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: #fff; border: 1.5px solid #c9ced6; border-radius: 10px; padding: 8px; }
+.tags:focus-within { border-color: var(--ink); box-shadow: 0 0 0 3px rgba(255,128,181,.5); }
+.tag { display: inline-flex; align-items: center; gap: 6px; background: var(--ink); color: #fff; border-radius: 999px; padding: 5px 6px 5px 12px; font-weight: 700; font-size: .88rem; }
+.tag.pinkt { background: var(--pink); color: var(--ink); border: 1.5px solid var(--ink); padding: 3px 5px 3px 11px; }
+.tag button { width: 20px; height: 20px; border-radius: 50%; border: 0; background: rgba(255,255,255,.22); color: inherit; line-height: 1; font-size: .8rem; }
+.tag.pinkt button { background: rgba(13,15,18,.14); }
+.tags input { flex: 1; min-width: 110px; border: 0; outline: 0; padding: 6px 4px; background: none; }
+
+.pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill { border: 1.5px solid #c9ced6; background: #fff; border-radius: 999px; padding: 8px 16px; font-weight: 600; transition: background .15s ease, color .15s ease; }
+.pill:hover { border-color: var(--ink); }
+.pill[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+.seg { display: flex; background: #eceef1; border-radius: 12px; padding: 4px; gap: 4px; }
+.seg button { flex: 1; border: 0; background: none; padding: 9px 8px; border-radius: 9px; font-weight: 700; color: var(--soft); }
+.seg button[aria-checked="true"] { background: #fff; color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+
+.check { display: flex; align-items: center; gap: 12px; padding: 9px 0; font-weight: 700; cursor: pointer; }
+.check input { position: absolute; opacity: 0; width: 0; height: 0; }
+.box { flex: none; width: 24px; height: 24px; border: 2px solid var(--ink); border-radius: 6px; background: #fff; display: grid; place-items: center; }
+.check input:checked + .box { background: var(--ink); }
+.check input:checked + .box::after { content: ""; width: 6px; height: 11px; border: solid var(--pink); border-width: 0 2.5px 2.5px 0; transform: rotate(45deg) translate(-1px, -1px); }
+.check input:focus-visible + .box { outline: 3px solid var(--magenta); outline-offset: 2px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.row + .row, .sep { border-top: 1px dashed #c3c8d0; margin-top: 14px; padding-top: 14px; }
+.val { font-family: var(--mono); font-weight: 700; }
+input[type=range] { width: 100%; accent-color: var(--ink); margin: 10px 0 0; }
+.stepper { display: flex; align-items: center; gap: 14px; }
+.stepper button { width: 40px; height: 40px; border-radius: 10px; border: 1.5px solid #c9ced6; background: #fff; font-size: 1.2rem; font-weight: 700; }
+.stepper button:hover { border-color: var(--ink); }
+.stepper b { font-size: 1.15rem; min-width: 1ch; text-align: center; }
+
+.cost { background: var(--ink); color: #fff; border-radius: 16px; padding: 20px 22px; font-family: var(--mono); font-size: .88rem; }
+.cost .r { display: flex; justify-content: space-between; color: #d5d9df; padding: 3px 0; }
+.cost hr { border: 0; border-top: 1px dashed #59606b; margin: 10px 0; }
+.cost .tot { display: flex; justify-content: space-between; align-items: baseline; }
+.cost .tot b { font-family: var(--sans); font-size: 2.2rem; letter-spacing: -0.04em; color: var(--pink); }
+.cost .why { margin: 8px 0 0; font-size: .74rem; color: #9aa1ac; }
+
+.actions { display: grid; gap: 10px; }
+.toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 12px 20px; border-radius: 999px; font-weight: 600; z-index: 20; max-width: calc(100% - 32px); text-align: center; }
+
+/* run page */
+.runhead { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px; }
+.steps { list-style: none; margin: 24px 0 0; padding: 0; display: grid; gap: 0; background: var(--card); border: 1.5px solid var(--ink); border-radius: 16px; box-shadow: 7px 7px 0 var(--ink); overflow: hidden; }
+.steps li { display: flex; gap: 14px; align-items: flex-start; padding: 16px 20px; border-top: 1.5px dashed #c3c8d0; }
+.steps li:first-child { border-top: 0; }
+.st-dot { flex: none; width: 28px; height: 28px; border-radius: 50%; border: 2px solid #c3c8d0; display: grid; place-items: center; margin-top: 1px; color: #fff; }
+.steps li.done .st-dot { background: var(--teal); border-color: var(--teal); }
+.steps li.now .st-dot { border-color: var(--ink); background: var(--pink); }
+.steps li b { display: block; line-height: 1.3; }
+.steps li span { color: var(--soft); font-size: .92rem; }
+.steps li.wait { opacity: .45; }
+.steps li.now b::after { content: " (working)"; font-weight: 400; color: var(--soft); }
+
+.rtop { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; margin: 34px 0 20px; }
+.rtop h2 { margin: 0; font-size: clamp(2rem, 6vw, 3rem); line-height: 1; font-weight: 800; letter-spacing: -0.045em; }
+.stats { display: flex; background: var(--card); border: 1.5px solid var(--line); border-radius: 12px; overflow: hidden; }
+.stat { padding: 10px 16px; min-width: 70px; border-left: 1px dashed #c3c8d0; }
+.stat:first-child { border-left: 0; }
+.stat b { display: block; font-family: var(--mono); font-size: 1.2rem; line-height: 1.2; }
+.stat span { font-family: var(--mono); font-size: .6rem; letter-spacing: .08em; text-transform: uppercase; color: var(--soft); }
+.stat.pinkc { background: var(--pink); border-left: 1.5px solid var(--ink); }
+
+.rlayout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-items: start; }
+.side { display: grid; gap: 12px; min-width: 0; }
+.item { background: var(--dim); border: 1.5px solid var(--line); border-radius: 14px; overflow: hidden; }
+.item.sel { background: #fff; border-color: var(--ink); box-shadow: 5px 5px 0 var(--ink); }
+.item-head { display: flex; width: 100%; padding: 0; border: 0; background: none; text-align: left; align-items: stretch; }
+.item-text { flex: 1; min-width: 0; padding: 14px 16px; }
+.kicker { font-family: var(--mono); font-size: .68rem; letter-spacing: .06em; text-transform: uppercase; color: var(--soft); }
+.item-title { display: block; margin: 4px 0 2px; font-weight: 800; font-size: 1.12rem; line-height: 1.2; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.item-sub { color: var(--soft); font-size: .92rem; }
+.score-block { flex: none; width: 82px; display: grid; place-content: center; text-align: center; border-left: 1.5px dashed #b9bec7; background: #eceef1; }
+.item.sel .score-block { background: var(--pink); border-left-color: var(--ink); }
+.score-block b { display: block; font-size: 2rem; line-height: 1; font-weight: 800; letter-spacing: -0.03em; }
+.score-block span { font-family: var(--mono); font-size: .62rem; letter-spacing: .08em; }
+.item.sel .item-head { border-bottom: 1.5px solid var(--ink); }
+.item:not(.sel) .item-head:hover { background: #fff; }
+.expand { padding: 14px 16px 16px; }
+.others-label { font-family: var(--mono); font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; color: var(--soft); margin: 10px 2px 0; }
+.other { display: flex; align-items: center; gap: 14px; background: #fff; border: 1.5px solid var(--line); border-radius: 12px; padding: 11px 14px; }
+.other-score { font-family: var(--mono); font-weight: 700; width: 26px; }
+.other-main { flex: 1; min-width: 0; }
+.other-main b { display: block; line-height: 1.25; overflow-wrap: anywhere; }
+.other-main span { font-size: .85rem; color: var(--soft); }
+.other a { font-weight: 700; font-size: .9rem; white-space: nowrap; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-family: var(--mono); font-size: .66rem; letter-spacing: .05em; text-transform: uppercase; background: #eceef1; border-radius: 6px; padding: 4px 8px; }
+.chip.low { background: var(--teal-bg); color: var(--teal); }
+.chip.medium { background: #fff0c9; color: #7a5200; }
+.reasons { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 6px; }
+.reasons li { display: flex; gap: 10px; align-items: flex-start; }
+.reasons svg { flex: none; margin-top: 4px; color: var(--teal); }
+.detail { background: #fff; border: 1.5px solid var(--ink); border-radius: 16px; box-shadow: 7px 7px 0 var(--ink); overflow: hidden; position: sticky; top: 16px; }
+.detail-head { display: flex; justify-content: space-between; gap: 20px; padding: 26px 26px 22px; }
+.detail-head h3 { margin: 14px 0 4px; font-size: clamp(1.6rem, 3vw, 2.1rem); line-height: 1.1; font-weight: 800; letter-spacing: -0.035em; overflow-wrap: anywhere; }
+.detail-head .by { color: var(--soft); margin: 0 0 14px; }
+.ring { position: relative; flex: none; width: 88px; height: 88px; }
+.ring svg { display: block; transform: rotate(-90deg); }
+.ring-num { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; line-height: 1; }
+.ring-num b { font-size: 1.7rem; font-weight: 800; letter-spacing: -0.03em; }
+.ring-num span { font-family: var(--mono); font-size: .6rem; color: var(--soft); margin-top: 3px; }
+.toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 14px 26px; background: var(--dim); border-top: 1.5px solid var(--line); border-bottom: 1.5px solid var(--line); }
+.tabseg { display: inline-flex; background: #eceef1; border-radius: 999px; padding: 4px; gap: 2px; }
+.tabseg button { border: 0; background: none; padding: 8px 16px; border-radius: 999px; font-weight: 700; font-size: .92rem; color: var(--soft); }
+.tabseg button[aria-selected="true"] { background: var(--ink); color: #fff; }
+.tabseg.full { display: flex; width: 100%; }
+.tabseg.full button { flex: 1; padding: 11px 8px; }
+.tabseg.full button[aria-selected="true"] { color: var(--pink); }
+.acts2 { display: flex; gap: 8px; }
+.btn.copy { background: var(--pink); }
+.btn.copy.done { background: var(--teal-bg); border-color: var(--teal); color: var(--teal); }
+.rbody { padding: 22px 26px 26px; }
+.body-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+.body-top h4 { margin: 0; font-size: 1.1rem; font-weight: 800; letter-spacing: -0.02em; }
+.words { font-family: var(--mono); font-size: .66rem; letter-spacing: .08em; text-transform: uppercase; color: var(--soft); }
+.text-box { background: #f7f8fa; border: 1.5px solid var(--line); border-radius: 10px; padding: 18px 20px; overflow-wrap: anywhere; }
+.text-box p { margin: 0; white-space: pre-wrap; max-width: 72ch; }
+.text-box ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; max-width: 72ch; }
+.draft { display: flex; align-items: center; gap: 8px; margin-top: 14px; color: var(--red); font-size: .9rem; }
+.narrow .draft { border: 1.5px dashed #e3a39d; border-radius: 10px; padding: 10px 14px; }
+.narrow .acts2 { margin-top: 14px; }
+.narrow .acts2 .btn { flex: 1; }
+
+.mail { margin-top: 44px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: start; }
+.mail h3 { margin: 0 0 8px; font-size: 1.6rem; font-weight: 800; letter-spacing: -0.035em; }
+.mail p { margin: 0 0 10px; color: var(--soft); max-width: 34em; }
+.mail .off { color: var(--ink); background: #fff8d6; border: 1.5px dashed #c9a800; border-radius: 12px; padding: 12px 14px; }
+.hdrs { font-family: var(--mono); font-size: .8rem; color: var(--soft); margin: 0 0 10px; line-height: 1.7; }
+.hdrs b { color: var(--ink); }
+.email { background: #fff; border: 1.5px solid var(--ink); border-radius: 18px; overflow: hidden; max-width: 460px; }
+.email .stripes { height: 30px; background: linear-gradient(var(--pink) 0 30%, var(--ink) 30% 42%, var(--pink) 42% 62%, var(--ink) 62% 74%, var(--pink) 74%); border-bottom: 1.5px solid var(--ink); }
+.email .in { padding: 22px 24px 8px; }
+.email .lg { display: flex; align-items: center; gap: 8px; font-weight: 800; }
+.email h5 { margin: 14px 0 10px; font-size: 1.9rem; line-height: 1; font-weight: 800; letter-spacing: -0.04em; }
+.email p { margin: 0 0 8px; color: var(--ink); font-size: .95rem; }
+.email .pillbtn { display: inline-block; margin: 8px 0 18px; background: var(--ink); color: var(--pink); font-weight: 700; padding: 11px 22px; border-radius: 999px; }
+.email .foot { border-top: 1px dashed #b9bec7; padding: 12px 24px; font-size: .78rem; color: var(--soft); }
+
+details.real { margin-top: 36px; background: #fff; border: 1.5px solid var(--line); border-radius: 14px; padding: 14px 18px; }
+details.real summary { font-weight: 700; cursor: pointer; }
+details.real p { color: var(--soft); margin: 10px 0; max-width: 40em; }
+pre.json { background: var(--dim); border: 1.5px solid var(--line); border-radius: 10px; padding: 14px; font-family: var(--mono); font-size: .78rem; max-height: 200px; overflow: auto; margin: 0 0 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.acts { display: flex; flex-wrap: wrap; gap: 10px; }
+.cron { font-family: var(--mono); background: #fbe3ec; padding: 1px 6px; border-radius: 5px; }
+
+@media (min-width: 900px) {
+  .signin { grid-template-columns: 1.1fr 1fr; gap: 72px; }
+  .layout { grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; }
+  .two { grid-template-columns: 1fr 1fr; }
+  .aside { position: sticky; top: 16px; }
+  .rlayout { grid-template-columns: 320px minmax(0, 1fr); gap: 24px; }
+  .mail { grid-template-columns: 1fr 1fr; gap: 48px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="root"><p class="boot">Loading. This page needs an internet connection to load.</p></div>
+
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.26.10/babel.min.js"></script>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+/* Where "Start" sends people. Set this to the published Actor URL from the Apify Store. */
+const ACTOR_URL = "https://console.apify.com/actors";
+
+const LOCATIONS = ["Lagos", "Remote", "Abuja", "Port Harcourt", "Ibadan"];
+const SOURCES = [
+  { id: "myjobmag", label: "MyJobMag" },
+  { id: "jobberman", label: "Jobberman" },
+  { id: "remote-rss", label: "Remote jobs (RSS)" },
+];
+const SCHEDULES = [
+  { id: "3", short: "3 hours", label: "Every 3 hours", cron: "0 */3 * * *" },
+  { id: "5", short: "5 hours", label: "Every 5 hours", cron: "0 */5 * * *" },
+  { id: "24", short: "Daily", label: "Every day", cron: "0 8 * * *" },
+];
+const PRICE_VERIFIED = 0.002, PRICE_RESULT = 0.01, PRICE_PACK = 0.50, PRICE_START = 0.00005, TYPICAL_MATCHES = 5;
+
+function load(key, fallback) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; }
+}
+function save(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch (e) { return false; }
+}
+function money(n) { return "$" + n.toFixed(2); }
+
+function useRoute() {
+  const [r, setR] = useState(window.location.hash || "#/signin");
+  useEffect(function () {
+    const f = function () { setR(window.location.hash || "#/signin"); };
+    window.addEventListener("hashchange", f);
+    return function () { window.removeEventListener("hashchange", f); };
+  }, []);
+  return r;
+}
+function go(hash) { window.location.hash = hash; }
+
+function Bar({ user, onOut }) {
+  return (
+    <div className="bar"><div className="bar-in">
+      <a className="logo" href="index.html">
+        <span className="mark" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#0d0f12" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4l2.5 8L8 6l3.5 6L14 4" /></svg></span>
+        WorkDey
+      </a>
+      {user ? <div className="who"><span>{user.name}</span><button type="button" className="linkbtn" onClick={onOut}>Sign out</button></div> : null}
+    </div></div>
+  );
+}
+
+function SignIn({ onDone }) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [err, setErr] = useState("");
+  function submit(e) {
+    e.preventDefault();
+    if (!name.trim()) return setErr("Add your name so we can put it on your replies and cover letters.");
+    if (email.trim() && !/^\S+@\S+\.\S+$/.test(email.trim())) return setErr("That email doesn't look right. Check it, or leave it empty to skip email alerts.");
+    onDone({ name: name.trim(), email: email.trim() });
+  }
+  return (
+    <main className="page">
+      <div className="signin">
+        <div>
+          <h1>Let's find you some work.</h1>
+          <p className="sub">Tell us who you are, then build your profile. It takes about five minutes, and you only do it once.</p>
+          <p className="note">no password, no card. Your details stay in this browser.</p>
+        </div>
+        <form className="panel" onSubmit={submit} noValidate>
+          <h2>Start here</h2>
+          <div className="field">
+            <label htmlFor="n">Full name</label>
+            <input id="n" className={"in" + (err && !name.trim() ? " bad" : "")} value={name} onChange={function (e) { setName(e.target.value); setErr(""); }} autoComplete="name" placeholder="Adaeze Okafor" />
+          </div>
+          <div className="field">
+            <label htmlFor="e">Email<small>Optional. Leave it empty to turn email off.</small></label>
+            <input id="e" className="in" type="email" value={email} onChange={function (e) { setEmail(e.target.value); setErr(""); }} autoComplete="email" placeholder="you@example.com" />
+          </div>
+          {err ? <p className="err" role="alert">{err}</p> : null}
+          <button type="submit" className="btn pink block" style={{ marginTop: 8 }}>Continue</button>
+          <p className="small">Signing in here only saves your profile in this browser. WorkDey runs on Apify, so your account there handles the actual runs.</p>
+        </form>
+      </div>
+    </main>
+  );
+}
+
+function TagInput({ value, onChange, placeholder, max, pink, label }) {
+  const [text, setText] = useState("");
+  function add() {
+    const t = text.trim().replace(/,$/, "").trim();
+    setText("");
+    if (!t || value.some(function (v) { return v.toLowerCase() === t.toLowerCase(); })) return;
+    if (max && value.length >= max) return;
+    onChange(value.concat(t));
+  }
+  function key(e) {
+    if (e.key === "Enter" || e.key === ",") { e.preventDefault(); add(); }
+    else if (e.key === "Backspace" && !text && value.length) onChange(value.slice(0, -1));
+  }
+  const full = max && value.length >= max;
+  return (
+    <div className="tags">
+      {value.map(function (v) {
+        return (
+          <span key={v} className={"tag" + (pink ? " pinkt" : "")}>{v}
+            <button type="button" aria-label={"Remove " + v} onClick={function () { onChange(value.filter(function (x) { return x !== v; })); }}>&times;</button>
+          </span>
+        );
+      })}
+      <input value={text} onChange={function (e) { setText(e.target.value); }} onKeyDown={key} onBlur={add} disabled={!!full}
+        placeholder={full ? "" : placeholder} aria-label={label} />
+    </div>
+  );
+}
+
+const EMPTY = {
+  fullName: "", email: "", education: "", experienceYears: "", skills: [], targetRoles: [], locations: ["Lagos"],
+  customLocations: [], workType: "either", cvText: "", sources: ["myjobmag", "jobberman", "remote-rss"],
+  minScore: 60, maxPacks: 3, schedule: "5",
+};
+
+function toInput(p) {
+  return {
+    fullName: p.fullName.trim(),
+    email: p.email.trim() || undefined,
+    skills: p.skills,
+    targetRoles: p.targetRoles,
+    education: p.education.trim() || undefined,
+    experienceYears: p.experienceYears === "" ? undefined : Number(p.experienceYears),
+    locations: p.locations.concat(p.customLocations),
+    workType: p.workType === "full-time" || p.workType === "gig" ? p.workType : "either",
+    cvText: p.cvText.trim() || undefined,
+    sources: p.sources,
+    minScore: p.minScore,
+    maxPacks: p.maxPacks,
+  };
+}
+
+function Profile({ user }) {
+  const [p, setP] = useState(function () {
+    const saved = load("workdey.profile", null);
+    return Object.assign({}, EMPTY, { fullName: user.name, email: user.email }, saved || {});
+  });
+  const [errs, setErrs] = useState({});
+  const [toast, setToast] = useState("");
+  function set(k, v) { setP(function (o) { const n = Object.assign({}, o); n[k] = v; return n; }); }
+  function say(m) { setToast(m); setTimeout(function () { setToast(""); }, 2600); }
+  function toggle(k, v) { set(k, p[k].indexOf(v) >= 0 ? p[k].filter(function (x) { return x !== v; }) : p[k].concat(v)); }
+
+  const packs = p.maxPacks;
+  const est = PRICE_START + TYPICAL_MATCHES * (PRICE_VERIFIED + PRICE_RESULT) + packs * PRICE_PACK;
+
+  function validate() {
+    const e = {};
+    if (!p.fullName.trim()) e.fullName = "We need your name for the reply and cover letter.";
+    if (p.email.trim() && !/^\S+@\S+\.\S+$/.test(p.email.trim())) e.email = "That email doesn't look right.";
+    if (!p.skills.length) e.skills = "Add at least one skill. It's the main thing we match on.";
+    if (!p.targetRoles.length) e.targetRoles = "Add at least one role you want.";
+    if (!p.sources.length) e.sources = "Pick at least one place to look.";
+    setErrs(e);
+    return Object.keys(e).length === 0;
+  }
+  function start() {
+    if (!validate()) { say("A few things need filling in first."); return; }
+    save("workdey.profile", p);
+    go("#/run");
+  }
+  function saveTask() {
+    if (!validate()) { say("A few things need filling in first."); return; }
+    say(save("workdey.profile", p) ? "Saved in this browser." : "Couldn't save. Your browser is blocking storage.");
+  }
+  return (
+    <main className="page">
+      <h1>Your profile</h1>
+      <p className="sub">The more real detail you give, the better the matches. WorkDey only ever writes what your CV and this form say.</p>
+      <div className="layout">
+        <div className="stack">
+          <div className="card">
+            <div className="two">
+              <div className="field">
+                <label htmlFor="fn">Full name</label>
+                <input id="fn" className={"in" + (errs.fullName ? " bad" : "")} value={p.fullName} onChange={function (e) { set("fullName", e.target.value); }} autoComplete="name" />
+                {errs.fullName ? <p className="err">{errs.fullName}</p> : null}
+              </div>
+              <div className="field">
+                <label htmlFor="em">Email<small>Optional</small></label>
+                <input id="em" className={"in" + (errs.email ? " bad" : "")} type="email" value={p.email} onChange={function (e) { set("email", e.target.value); }} autoComplete="email" />
+                {errs.email ? <p className="err">{errs.email}</p> : null}
+              </div>
+              <div className="field">
+                <label htmlFor="ed">Education</label>
+                <input id="ed" className="in" value={p.education} onChange={function (e) { set("education", e.target.value); }} placeholder="BSc Statistics, UNILAG, NYSC 2025" />
+              </div>
+              <div className="field">
+                <label htmlFor="ex">Experience (years)</label>
+                <input id="ex" className="in" type="number" min="0" max="40" value={p.experienceYears} onChange={function (e) { set("experienceYears", e.target.value); }} placeholder="1" />
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="field">
+              <span className="lab">Skills<small>Type one and press Enter</small></span>
+              <TagInput value={p.skills} onChange={function (v) { set("skills", v); }} placeholder="Add skill" label="Skills" />
+              {errs.skills ? <p className="err">{errs.skills}</p> : null}
+            </div>
+            <div className="field">
+              <span className="lab">Target roles<small>Up to 3</small></span>
+              <TagInput pink max={3} value={p.targetRoles} onChange={function (v) { set("targetRoles", v); }} placeholder="Add role" label="Target roles" />
+              {errs.targetRoles ? <p className="err">{errs.targetRoles}</p> : null}
+            </div>
+            <div className="field">
+              <span className="lab">Where can you work?</span>
+              <div className="pills">
+                {LOCATIONS.map(function (l) {
+                  return <button type="button" key={l} className="pill" aria-pressed={p.locations.indexOf(l) >= 0} onClick={function () { toggle("locations", l); }}>{l}</button>;
+                })}
+                {p.customLocations.map(function (l) {
+                  return <button type="button" key={l} className="pill" aria-pressed="true" title="Remove" onClick={function () { set("customLocations", p.customLocations.filter(function (x) { return x !== l; })); }}>{l} &times;</button>;
+                })}
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <input className="in" placeholder="Another city? Type it and press Enter" aria-label="Add another city"
+                  onKeyDown={function (e) {
+                    if (e.key !== "Enter") return;
+                    e.preventDefault();
+                    const t = e.target.value.trim();
+                    if (t && LOCATIONS.concat(p.customLocations).indexOf(t) < 0) set("customLocations", p.customLocations.concat(t));
+                    e.target.value = "";
+                  }} />
+              </div>
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <span className="lab" id="wt">Work type</span>
+              <div className="seg" role="radiogroup" aria-labelledby="wt">
+                {[["full-time", "Full-time"], ["gig", "Gig"], ["either", "Either"]].map(function (o) {
+                  return <button type="button" key={o[0]} role="radio" aria-checked={p.workType === o[0]} onClick={function () { set("workType", o[0]); }}>{o[1]}</button>;
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label htmlFor="cv">CV text<small>Plain text. We only use facts from here.</small></label>
+              <textarea id="cv" className="in" value={p.cvText} onChange={function (e) { set("cvText", e.target.value); }}
+                placeholder={"Paste your CV here.\n\nInclude your jobs, dates, what you built or achieved, and your skills."} />
+            </div>
+          </div>
+        </div>
+
+        <aside className="stack aside">
+          <div className="card">
+            <span className="lab">Where should we look?</span>
+            {SOURCES.map(function (s) {
+              return (
+                <label className="check" key={s.id}>
+                  <input type="checkbox" checked={p.sources.indexOf(s.id) >= 0} onChange={function () { toggle("sources", s.id); }} />
+                  <span className="box" aria-hidden="true"></span>{s.label}
+                </label>
+              );
+            })}
+            {errs.sources ? <p className="err">{errs.sources}</p> : null}
+            <div className="sep">
+              <div className="row"><label htmlFor="ms" className="lab" style={{ margin: 0 }}>Minimum fit score</label><span className="val">{p.minScore}</span></div>
+              <input id="ms" type="range" min="0" max="100" value={p.minScore} onChange={function (e) { set("minScore", Number(e.target.value)); }} />
+            </div>
+            <div className="row sep">
+              <span className="lab" id="pk">Packs per run</span>
+              <div className="stepper" role="group" aria-labelledby="pk">
+                <button type="button" aria-label="Fewer packs" onClick={function () { set("maxPacks", Math.max(1, packs - 1)); }}>&minus;</button>
+                <b>{packs}</b>
+                <button type="button" aria-label="More packs" onClick={function () { set("maxPacks", Math.min(5, packs + 1)); }}>+</button>
+              </div>
+            </div>
+            <div className="sep">
+              <span className="lab" id="sc">How often?</span>
+              <div className="seg" role="radiogroup" aria-labelledby="sc" style={{ marginTop: 8 }}>
+                {SCHEDULES.map(function (s) {
+                  return <button type="button" key={s.id} role="radio" aria-checked={p.schedule === s.id} onClick={function () { set("schedule", s.id); }}>{s.short}</button>;
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="cost" aria-label="Estimated cost per run">
+            <div className="r"><span>{TYPICAL_MATCHES} x verified match</span><span>{money(TYPICAL_MATCHES * PRICE_VERIFIED)}</span></div>
+            <div className="r"><span>{TYPICAL_MATCHES} x result</span><span>{money(TYPICAL_MATCHES * PRICE_RESULT)}</span></div>
+            <div className="r"><span>{packs} x application pack</span><span>{money(packs * PRICE_PACK)}</span></div>
+            <hr />
+            <div className="tot"><span>Est. per run</span><b>{money(est)}</b></div>
+            <p className="why">Based on {TYPICAL_MATCHES} matches a run. Each pack is $0.50, so fewer packs costs less.</p>
+          </div>
+
+          <div className="actions">
+            <button type="button" className="btn pink block" onClick={start}>Start</button>
+            <button type="button" className="btn block" onClick={saveTask}>Save as task</button>
+          </div>
+        </aside>
+      </div>
+
+      {toast ? <div className="toast" role="status">{toast}</div> : null}
+    </main>
+  );
+}
+
+const SOURCE_LABEL = { "myjobmag": "MyJobMag", "jobberman": "Jobberman", "remote-rss": "Remote jobs (RSS)" };
+
+function listJoin(a) { return a.length <= 1 ? (a[0] || "") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1]; }
+
+/* Sample jobs shaped by the profile. A real run happens on Apify; this shows what she will get. */
+function demoMatches(p) {
+  const roles = p.targetRoles.length ? p.targetRoles : ["Data Analyst"];
+  const skills = p.skills.slice(0, 4);
+  const src = p.sources.length ? p.sources : ["myjobmag"];
+  const S = function (i) { return SOURCE_LABEL[src[i % src.length]]; };
+  const loc = p.locations.concat(p.customLocations)[0] || "Lagos";
+  const first = p.fullName.trim().split(" ")[0] || "";
+  const skillLine = skills.length ? listJoin(skills.slice(0, 3)) + " match your CV" : "Matches your profile";
+  const exp = p.experienceYears === "" ? "" : p.experienceYears + (Number(p.experienceYears) === 1 ? " year" : " years");
+  const base = [
+    { title: "Junior " + roles[0], company: "Kora Logistics", location: "Yaba, " + loc, source: S(0), postedAt: "9h ago", fitScore: 86, workType: "Full-time", reasons: [skillLine, "Entry level role in " + loc] },
+    { title: roles[1] || "Reporting Analyst", company: "Tanta Health", location: "Remote, Nigeria", source: S(1), postedAt: "1d ago", fitScore: 78, workType: "Full-time", reasons: [skills[1] ? skills[1] + " is asked for in the post" : "Close to the role you want", "Open to remote applicants"] },
+    { title: "Spreadsheet cleanup", company: "Independent poster", location: "Remote", source: S(2), postedAt: "5h ago", fitScore: 71, workType: "Gig", reasons: ["Short task that fits your skills", "Quick to start"] },
+    { title: "Data Officer", company: "Brightline MFB", location: loc, source: S(0), postedAt: "2d ago", fitScore: 64, reasons: [] },
+    { title: "M&E Assistant", company: "Hopeline Foundation", location: "Abuja", source: S(1), postedAt: "2d ago", fitScore: 61, reasons: [] },
+  ];
+  return base.filter(function (m) { return m.fitScore >= p.minScore; }).map(function (m, i) {
+    const m2 = Object.assign({ scamRisk: "low", url: "#" }, m);
+    if (i < p.maxPacks) {
+      m2.coverLetter = "Dear Hiring Team at " + m.company + ",\n\nI am applying for the " + m.title + " role." +
+        (p.education.trim() ? " " + p.education.trim() + "." : "") +
+        (skills.length ? "\n\nMy skills include " + listJoin(skills) + (exp ? ", and I have " + exp + " of hands-on experience." : ".") : "") +
+        "\n\nI would welcome the chance to discuss how I can support your team. Thank you for your time.\n\nYours sincerely,\n" + p.fullName.trim();
+      m2.reply = "Hello, I saw your post for " + m.title + " at " + m.company + "." + (skills.length ? " I work with " + listJoin(skills.slice(0, 3)) + "." : "") + " Could we speak this week?\n\n" + first;
+      m2.cvTips = [
+        (skills[0] || "Your strongest skill") + " is in the post. Put it first in your skills list.",
+        "Add one measurable result to your most recent role.",
+        "Change your CV headline to “" + m.title + "”.",
+        "Rewritten summary: " + (p.education.trim() || "Graduate") + (exp ? " with " + exp + " of hands-on experience" : "") + (skills.length ? " in " + listJoin(skills.slice(0, 3)) : "") + ", looking for a " + m.title + " role.",
+      ];
+    }
+    return m2;
+  });
+}
+
+function wordsOf(t) { const s = String(t || "").trim(); return s ? s.split(/\s+/).length : 0; }
+function textOf(v) { return Array.isArray(v) ? v.map(function (x) { return "- " + x; }).join("\n") : String(v == null ? "" : v); }
+function hasPack(m) { return !!(m.reply || m.coverLetter || m.cvTips); }
+
+function Ico({ name }) {
+  const p = { width: 16, height: 16, viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" };
+  if (name === "check") return <svg {...p}><path d="M3 8.5l3.2 3L13 4.5" /></svg>;
+  if (name === "copy") return <svg {...p}><rect x="5.5" y="5.5" width="8" height="8" rx="1.5" /><path d="M10.5 5.5v-2a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2" /></svg>;
+  return <svg {...p}><circle cx="8" cy="8" r="6" /><path d="M8 5v3.5M8 11h.01" /></svg>;
+}
+
+function useWide() {
+  const q = "(min-width: 900px)";
+  const [w, setW] = useState(function () { return window.matchMedia(q).matches; });
+  useEffect(function () {
+    const mq = window.matchMedia(q);
+    const f = function (e) { setW(e.matches); };
+    mq.addEventListener("change", f);
+    return function () { mq.removeEventListener("change", f); };
+  }, []);
+  return w;
+}
+
+function CopyBtn({ text, label, plain }) {
+  const [done, setDone] = useState(false);
+  function copy() {
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(text).then(function () { setDone(true); setTimeout(function () { setDone(false); }, 1800); }, function () {});
+  }
+  return (
+    <button type="button" className={"btn " + (plain ? "" : "copy") + (done ? " done" : "")} onClick={copy} aria-label={"Copy " + label}>
+      {plain ? null : <Ico name={done ? "check" : "copy"} />}{done ? "Copied" : (plain ? "Copy settings" : "Copy")}
+    </button>
+  );
+}
+
+function Ring({ score }) {
+  const s = Math.max(0, Math.min(100, Number(score) || 0));
+  const r = 38, c = 2 * Math.PI * r;
+  return (
+    <div className="ring" role="img" aria-label={"Fit score " + s + " out of 100"}>
+      <svg width="88" height="88" viewBox="0 0 88 88" aria-hidden="true">
+        <circle cx="44" cy="44" r={r} fill="none" stroke="#e8eaee" strokeWidth="7" />
+        <circle cx="44" cy="44" r={r} fill="none" stroke="#0f7a63" strokeWidth="7" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - s / 100)} />
+      </svg>
+      <div className="ring-num"><b>{s}</b><span>/ 100</span></div>
+    </div>
+  );
+}
+
+const TABS = [
+  { key: "coverLetter", label: "Cover letter", short: "Letter", max: 280 },
+  { key: "reply", label: "Reply", short: "Reply", max: 90 },
+  { key: "cvTips", label: "CV tips", short: "CV tips", max: 0 },
+];
+
+function Reasons({ list }) {
+  return <ul className="reasons">{(list || []).map(function (r, i) { return <li key={i}><Ico name="check" /><span>{r}</span></li>; })}</ul>;
+}
+
+function Detail({ m, wide }) {
+  const [tab, setTab] = useState("coverLetter");
+  const t = TABS.find(function (x) { return x.key === tab; });
+  const value = m[tab];
+  const text = textOf(value);
+  const n = wordsOf(text);
+  const risk = m.scamRisk ? String(m.scamRisk).toLowerCase() : "";
+  const tabs = (
+    <div className={"tabseg" + (wide ? "" : " full")} role="tablist" aria-label="Drafts for this job">
+      {TABS.map(function (x) {
+        return <button key={x.key} type="button" role="tab" aria-selected={tab === x.key} onClick={function () { setTab(x.key); }}>{wide ? x.label : x.short}</button>;
+      })}
+    </div>
+  );
+  const acts = (
+    <div className="acts2">
+      {wide
+        ? <><a className="btn" href={m.url} target="_blank" rel="noopener noreferrer">View post</a><CopyBtn text={text} label={t.label} /></>
+        : <><CopyBtn text={text} label={t.label} /><a className="btn" href={m.url} target="_blank" rel="noopener noreferrer">View post</a></>}
+    </div>
+  );
+  const box = (
+    <div className="text-box" role="tabpanel">
+      {Array.isArray(value) ? <ul>{value.map(function (v, i) { return <li key={i}>{v}</li>; })}</ul> : <p>{text}</p>}
+    </div>
+  );
+  const draft = <div className="draft"><Ico name="alert" /><span><b>Draft.</b> Review before sending.</span></div>;
+  const top = <div className="body-top"><h4>{t.label}</h4>{t.max ? <span className="words">{n + " / " + t.max + " words"}</span> : null}</div>;
+  if (wide) {
+    return (
+      <section className="detail" aria-label={m.title}>
+        <div className="detail-head">
+          <div>
+            <div className="chips">
+              <span className="chip">{m.source}</span><span className="chip">{m.location}</span>
+              {m.workType ? <span className="chip">{m.workType}</span> : null}
+              {risk ? <span className={"chip " + risk}>{"Scam risk " + risk}</span> : null}
+            </div>
+            <h3>{m.title}</h3>
+            <p className="by">{m.company + " · " + m.postedAt}</p>
+            <Reasons list={m.reasons} />
+          </div>
+          <Ring score={m.fitScore} />
+        </div>
+        <div className="toolbar">{tabs}{acts}</div>
+        <div className="rbody">{top}{box}{draft}</div>
+      </section>
+    );
+  }
+  return (
+    <div className="expand narrow">
+      <Reasons list={m.reasons} />
+      {tabs}
+      <div style={{ marginTop: 16 }}>{top}</div>
+      {box}
+      {draft}
+      {acts}
+    </div>
+  );
+}
+
+function Run({ user }) {
+  const wide = useWide();
+  const [p] = useState(function () { return Object.assign({}, EMPTY, { fullName: user.name, email: user.email }, load("workdey.profile", {})); });
+  const [all] = useState(function () { return demoMatches(p); });
+  const packs = all.filter(hasPack);
+  const others = all.filter(function (m) { return !hasPack(m); });
+  const email = p.email.trim();
+  const srcNames = p.sources.map(function (s) { return SOURCE_LABEL[s] || s; });
+  const steps = [
+    { t: "Reading job sources", d: srcNames.length ? listJoin(srcNames) : "No sources picked" },
+    { t: "Dropping repeats, scams and non-jobs", d: "214 posts read, 142 look real" },
+    { t: "Scoring each job against your profile", d: all.length + (all.length === 1 ? " job scores " : " jobs score ") + p.minScore + " or higher" },
+    { t: "Writing your application packs", d: packs.length + (packs.length === 1 ? " pack" : " packs") + ": reply, cover letter and CV tips" },
+    { t: email ? "Emailing you" : "Email is off", d: email ? "Sent to " + email : "Add an email in your profile to get alerts" },
+  ];
+  const reduce = (function () { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } })();
+  const [n, setN] = useState(reduce ? steps.length : 0);
+  const [sel, setSel] = useState(0);
+  useEffect(function () {
+    if (n >= steps.length) return;
+    const id = setTimeout(function () { setN(n + 1); }, 850);
+    return function () { clearTimeout(id); };
+  }, [n]);
+  const done = n >= steps.length;
+  const cur = packs[Math.min(sel, packs.length - 1)];
+  const json = JSON.stringify(toInput(p), null, 2);
+  const top = all[0];
+
+  return (
+    <main className="page">
+      <div className="runhead">
+        <div>
+          <h1>{done ? "Your matches" : "Looking for you"}</h1>
+          <p className="sub">{p.targetRoles.join(", ") || "Your roles"} in {p.locations.concat(p.customLocations).join(", ") || "anywhere"}. Minimum score {p.minScore}.</p>
+        </div>
+        <div className="acts">
+          <button type="button" className="btn" onClick={function () { go("#/profile"); }}>Edit profile</button>
+          <button type="button" className="btn" onClick={function () { setN(0); setSel(0); }}>Run again</button>
+        </div>
+      </div>
+
+      <ol className="steps" aria-live="polite">
+        {steps.map(function (s, i) {
+          const state = i < n ? "done" : i === n ? "now" : "wait";
+          return (
+            <li key={i} className={state}>
+              <span className="st-dot">{state === "done" ? <Ico name="check" /> : null}</span>
+              <div><b>{s.t}</b>{state === "done" ? <span>{s.d}</span> : null}</div>
+            </li>
+          );
+        })}
+      </ol>
+
+      {done ? (
+        <>
+          <div className="rtop">
+            <h2>{all.length === 0 ? "No matches this run" : (packs.length || all.length) + ((packs.length || all.length) === 1 ? " match" : " matches")}</h2>
+            <div className="stats">
+              <div className="stat"><b>214</b><span>Scanned</span></div>
+              <div className="stat"><b>142</b><span>Verified</span></div>
+              <div className="stat"><b>{all.length}</b><span>Matches</span></div>
+              <div className="stat pinkc"><b>{packs.length}</b><span>Packs</span></div>
+            </div>
+          </div>
+
+          {all.length === 0 ? (
+            <div className="panel"><h2>Nothing scored {p.minScore} or higher</h2><p className="sub">Try lowering the minimum fit score in your profile, or add more skills.</p></div>
+          ) : (
+            <div className="rlayout">
+              <div className="side">
+                {packs.map(function (m, i) {
+                  const on = cur === m;
+                  return (
+                    <div key={i} className={"item" + (on ? " sel" : "")}>
+                      <button type="button" className="item-head" aria-pressed={on} onClick={function () { setSel(i); }}>
+                        <span className="item-text">
+                          <span className="kicker">{m.source + " · " + m.postedAt}</span>
+                          <span className="item-title">{m.title}</span>
+                          <span className="item-sub">{m.company + " · " + m.location}</span>
+                        </span>
+                        <span className="score-block"><b>{m.fitScore}</b><span>FIT</span></span>
+                      </button>
+                      {on && !wide ? <Detail key={i} m={m} wide={false} /> : null}
+                    </div>
+                  );
+                })}
+                {others.length ? <div className="others-label">Other matches</div> : null}
+                {others.map(function (m, i) {
+                  return (
+                    <div className="other" key={i}>
+                      <span className="other-score">{m.fitScore}</span>
+                      <span className="other-main"><b>{m.title}</b><span>{m.company + " · " + m.location}</span></span>
+                      <a href={m.url}>View post</a>
+                    </div>
+                  );
+                })}
+              </div>
+              {wide && cur ? <Detail key={packs.indexOf(cur)} m={cur} wide={true} /> : null}
+            </div>
+          )}
+
+          <section className="mail" aria-labelledby="mail-h">
+            <div>
+              <h3 id="mail-h">{email ? "We emailed you" : "Email alerts are off"}</h3>
+              {email
+                ? <p>You get a short email like this after every run, with a button that opens these matches. That is all you need to check.</p>
+                : <p className="off">Add your email in your profile and we will send you a short alert after every run, instead of you checking this page.</p>}
+            </div>
+            {all.length && email ? (
+              <div>
+                <p className="hdrs"><b>To</b> {email}<br /><b>Subject</b> {all.length} new job {all.length === 1 ? "match" : "matches"} for you</p>
+                <div className="email">
+                  <div className="stripes"></div>
+                  <div className="in">
+                    <div className="lg"><span className="mark" style={{ border: "1.5px solid #0d0f12", width: 26, height: 26 }}><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#0d0f12" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4l2.5 8L8 6l3.5 6L14 4" /></svg></span>WorkDey</div>
+                    <h5>{all.length} new {all.length === 1 ? "match" : "matches"}</h5>
+                    <p><b>{top.title}</b>, {top.company}. Score {top.fitScore}.</p>
+                    <p>{top.reasons[0]}. Packs drafted for {packs.length === all.length ? (all.length === 1 ? "it" : "all " + all.length) : packs.length + " of " + all.length}.</p>
+                    <span className="pillbtn">View matches</span>
+                  </div>
+                  <div className="foot">{money(packs.length * PRICE_PACK + all.length * (PRICE_VERIFIED + PRICE_RESULT) + PRICE_START)} for this run</div>
+                </div>
+              </div>
+            ) : null}
+          </section>
+        </>
+      ) : null}
+
+      <details className="real">
+        <summary>Run it for real on Apify</summary>
+        <p>WorkDey runs on Apify. Copy your settings, open the Actor, paste them into its input and press Start. To repeat it, save the input as a task and add a schedule with <span className="cron">{(SCHEDULES.find(function (s) { return s.id === p.schedule; }) || SCHEDULES[1]).cron}</span>.</p>
+        <pre className="json">{json}</pre>
+        <div className="acts">
+          <CopyBtn text={json} label="settings" plain />
+          <a className="btn pink" href={ACTOR_URL} target="_blank" rel="noopener noreferrer">Open WorkDey on Apify</a>
+        </div>
+      </details>
+    </main>
+  );
+}
+
+function App() {
+  const route = useRoute();
+  const [user, setUser] = useState(function () { return load("workdey.user", null); });
+  function signIn(u) { save("workdey.user", u); setUser(u); go("#/profile"); }
+  function signOut() { try { localStorage.removeItem("workdey.user"); } catch (e) {} setUser(null); go("#/signin"); }
+
+  useEffect(function () {
+    if (!user && route !== "#/signin") go("#/signin");
+    if (user && route !== "#/profile" && route !== "#/run") go("#/profile");
+  }, [user, route]);
+
+  return (
+    <>
+      <Bar user={user} onOut={signOut} />
+      {!user ? <SignIn onDone={signIn} /> : route === "#/run" ? <Run user={user} /> : <Profile user={user} />}
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

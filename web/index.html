@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WorkDey: jobs that fit, in your inbox</title>
+<meta name="description" content="WorkDey reads job boards while you sleep, keeps the jobs that fit your CV, and emails you a reply and cover letter ready to send.">
+<style>
+:root {
+  --bg: #f3f4f6; --ink: #0d0f12; --soft: #565c66; --line: #dfe2e7;
+  --card: #fff; --pink: #ff80b5; --magenta: #c2185b; --teal: #0f7a63; --teal-bg: #d9f1ea; --red: #b3261e;
+  --sans: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, Consolas, monospace;
+  --hand: "Segoe Print", "Bradley Hand", "Chalkboard SE", "Comic Sans MS", cursive;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 17px; line-height: 1.55; }
+a { color: inherit; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--magenta); outline-offset: 2px; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+
+/* top bar */
+.bar { background: var(--ink); color: #fff; position: sticky; top: 0; z-index: 10; }
+.bar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 12px; padding-bottom: 12px; }
+.logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.1rem; text-decoration: none; }
+.mark { width: 28px; height: 28px; border-radius: 8px; background: var(--pink); display: grid; place-items: center; }
+.nav { display: flex; align-items: center; gap: 22px; font-size: .95rem; }
+.nav a { text-decoration: none; color: #d5d9df; }
+.nav a:hover { color: #fff; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1.5px solid var(--ink); border-radius: 999px; padding: 11px 22px; font-weight: 700; text-decoration: none; background: #fff; color: var(--ink); transition: background .15s ease; }
+.btn:hover { background: #f1f2f4; }
+.btn.pink { background: var(--pink); }
+.btn.pink:hover { background: #ff6aa8; }
+.bar .btn { padding: 8px 18px; border-color: var(--pink); }
+.bar .nav a.btn { color: var(--ink); }
+
+/* hero */
+.hero { padding: 64px 0 88px; }
+.hero .wrap { display: grid; grid-template-columns: minmax(0, 1fr); gap: 56px; align-items: center; }
+h1 { margin: 0; font-size: clamp(2.6rem, 7.5vw, 4.6rem); line-height: .98; font-weight: 800; letter-spacing: -0.05em; }
+.lead { margin: 22px 0 0; font-size: 1.2rem; max-width: 34em; color: #2b3038; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+.fine { margin: 14px 0 0; font-size: .92rem; color: var(--soft); }
+
+.stage { position: relative; min-height: 500px; }
+.email { position: absolute; left: 0; top: 84px; width: min(370px, 92%); background: #fff; border: 1.5px solid var(--ink); border-radius: 18px; overflow: hidden; transform: rotate(-2.2deg); box-shadow: 7px 7px 0 var(--ink); z-index: 2; }
+.email .stripes { height: 34px; background: linear-gradient(var(--pink) 0 30%, var(--ink) 30% 42%, var(--pink) 42% 62%, var(--ink) 62% 74%, var(--pink) 74%); border-bottom: 1.5px solid var(--ink); }
+.email .in { padding: 22px 24px 8px; }
+.email .lg { display: flex; align-items: center; gap: 8px; font-weight: 800; }
+.email .mark { border: 1.5px solid var(--ink); width: 26px; height: 26px; }
+.email h3 { margin: 16px 0 10px; font-size: 2rem; line-height: 1; font-weight: 800; letter-spacing: -0.04em; }
+.email p { margin: 0 0 8px; font-size: .95rem; }
+.email .pill { display: inline-block; margin: 8px 0 18px; background: var(--ink); color: var(--pink); font-weight: 700; padding: 11px 22px; border-radius: 999px; }
+.email .foot { border-top: 1px dashed #b9bec7; padding: 12px 24px; font-size: .78rem; color: var(--soft); }
+.rcard { position: absolute; right: 0; top: 0; width: min(300px, 70%); background: #fff; border: 1.5px solid var(--ink); border-radius: 16px; overflow: hidden; transform: rotate(3deg); z-index: 1; margin-top: 190px; }
+.rcard .top { display: flex; }
+.rcard .t { flex: 1; padding: 12px 14px; }
+.rcard .t small { font-family: var(--mono); font-size: .62rem; color: var(--soft); letter-spacing: .05em; }
+.rcard .t b { display: block; font-size: 1rem; line-height: 1.2; letter-spacing: -0.02em; margin: 3px 0; }
+.rcard .t span { font-size: .8rem; color: var(--soft); }
+.rcard .sc { width: 66px; background: var(--pink); border-left: 1.5px dashed var(--ink); display: grid; place-content: center; text-align: center; }
+.rcard .sc b { font-size: 1.7rem; line-height: 1; font-weight: 800; }
+.rcard .sc span { font-family: var(--mono); font-size: .55rem; }
+.rcard .bd { border-top: 1.5px solid var(--ink); padding: 12px 14px; font-size: .84rem; }
+.rcard .bd i { display: block; font-style: normal; color: var(--teal); margin-bottom: 2px; }
+.note { position: absolute; font-family: var(--hand); color: var(--magenta); font-size: 1.02rem; line-height: 1.2; z-index: 3; max-width: 170px; }
+.note svg { display: block; }
+.n1 { right: 0; top: -28px; text-align: left; }
+.n2 { left: 8px; bottom: 0; }
+
+/* sections */
+section { padding: 84px 0; }
+h2 { margin: 0; font-size: clamp(2rem, 5vw, 3rem); line-height: 1.02; font-weight: 800; letter-spacing: -0.045em; }
+.kicker { font-family: var(--hand); color: var(--magenta); font-size: 1.15rem; margin: 0 0 8px; }
+
+.chores { background: var(--ink); color: #fff; }
+.chores .wrap { display: grid; grid-template-columns: minmax(0, 1fr); gap: 36px; }
+.chores ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.chores li { font-size: clamp(1.25rem, 3vw, 1.7rem); font-weight: 700; letter-spacing: -0.02em; text-decoration: line-through; text-decoration-color: var(--pink); text-decoration-thickness: 3px; color: #cfd3da; }
+.chores p { margin: 22px 0 0; font-size: 1.2rem; color: #fff; max-width: 26em; }
+.chores p b { color: var(--pink); }
+
+.how .wrap { display: grid; grid-template-columns: minmax(0, 1fr); gap: 40px; }
+.how .head p { margin: 16px 0 0; color: var(--soft); max-width: 24em; }
+.steps { list-style: none; margin: 0; padding: 0; position: relative; }
+.steps::before { content: ""; position: absolute; left: 22px; top: 12px; bottom: 12px; border-left: 2px dashed #b9bec7; }
+.steps li { position: relative; padding: 0 0 34px 68px; }
+.steps li:last-child { padding-bottom: 0; }
+.steps .n { position: absolute; left: 0; top: 0; width: 46px; height: 46px; border-radius: 14px; background: var(--ink); color: var(--pink); display: grid; place-items: center; font-family: var(--mono); font-weight: 700; font-size: 1.1rem; }
+.steps li.last .n { background: var(--pink); color: var(--ink); border: 1.5px solid var(--ink); }
+.steps h3 { margin: 0 0 4px; font-size: 1.35rem; line-height: 1.2; font-weight: 800; letter-spacing: -0.025em; }
+.steps p { margin: 0; color: #3a4049; max-width: 36em; }
+.steps .aside { display: block; margin-top: 8px; font-family: var(--hand); color: var(--magenta); font-size: 1rem; }
+
+.try { background: #fbe3ec; border-top: 1.5px solid var(--ink); border-bottom: 1.5px solid var(--ink); }
+.try .wrap { display: grid; grid-template-columns: minmax(0, 1fr); gap: 36px; align-items: center; }
+.try p.sub { margin: 14px 0 0; max-width: 26em; color: #3a4049; }
+.demo { background: #fff; border: 1.5px solid var(--ink); border-radius: 16px; box-shadow: 7px 7px 0 var(--ink); overflow: hidden; }
+.demo .top { display: flex; border-bottom: 1.5px solid var(--ink); }
+.demo .t { flex: 1; padding: 16px 18px; }
+.demo .t small { font-family: var(--mono); font-size: .68rem; letter-spacing: .05em; color: var(--soft); }
+.demo .t b { display: block; font-size: 1.3rem; line-height: 1.15; letter-spacing: -0.03em; margin: 4px 0 2px; }
+.demo .t span { color: var(--soft); font-size: .93rem; }
+.demo .sc { width: 88px; background: var(--pink); border-left: 1.5px dashed var(--ink); display: grid; place-content: center; text-align: center; }
+.demo .sc b { font-size: 2.2rem; line-height: 1; font-weight: 800; }
+.demo .sc span { font-family: var(--mono); font-size: .62rem; }
+.demo .why { list-style: none; margin: 0; padding: 14px 18px 0; display: grid; gap: 4px; font-size: .95rem; }
+.demo .why li::before { content: "\2713"; color: var(--teal); font-weight: 800; margin-right: 10px; }
+.tabs { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 14px 18px; }
+.seg { display: inline-flex; background: #eceef1; border-radius: 999px; padding: 4px; }
+.seg button { border: 0; background: none; padding: 7px 14px; border-radius: 999px; font-weight: 700; font-size: .88rem; color: var(--soft); }
+.seg button[aria-selected="true"] { background: var(--ink); color: #fff; }
+.copy { background: var(--pink); border: 1.5px solid var(--ink); border-radius: 999px; padding: 7px 16px; font-weight: 700; font-size: .9rem; min-width: 84px; }
+.copy.done { background: var(--teal-bg); border-color: var(--teal); color: var(--teal); }
+.txt { margin: 0 18px 18px; background: #f7f8fa; border: 1.5px solid var(--line); border-radius: 10px; padding: 14px 16px; white-space: pre-wrap; font-size: .93rem; min-height: 190px; }
+.draft { margin: 0 18px 18px; color: var(--red); font-size: .85rem; }
+.draft b { font-weight: 800; }
+
+.honest .wrap { display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px; }
+.rules { display: grid; gap: 0; border: 1.5px solid var(--ink); border-radius: 16px; background: #fff; overflow: hidden; }
+.rules div { padding: 20px 22px; border-top: 1.5px dashed #b9bec7; }
+.rules div:first-child { border-top: 0; }
+.rules b { display: block; font-size: 1.15rem; letter-spacing: -0.02em; }
+.rules span { color: #3a4049; }
+
+.price { background: var(--card); border-top: 1.5px solid var(--line); }
+.price .wrap { display: grid; grid-template-columns: minmax(0, 1fr); gap: 36px; align-items: center; }
+.price p.sub { margin: 14px 0 0; color: var(--soft); max-width: 26em; }
+.receipt { background: var(--ink); color: #fff; border-radius: 16px; padding: 24px 26px; font-family: var(--mono); font-size: .92rem; }
+.receipt .r { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; color: #d5d9df; }
+.receipt hr { border: 0; border-top: 1px dashed #59606b; margin: 12px 0; }
+.receipt .tot { display: flex; justify-content: space-between; align-items: baseline; }
+.receipt .tot b { font-family: var(--sans); font-size: 2.6rem; letter-spacing: -0.04em; color: var(--pink); }
+.receipt .day { margin-top: 10px; color: #aab0ba; font-size: .8rem; }
+
+.pricecol { display: grid; gap: 14px; }
+.tiny { margin: 0; font-size: .85rem; color: var(--soft); }
+.final { text-align: left; }
+.final .box { background: var(--pink); border: 1.5px solid var(--ink); border-radius: 20px; box-shadow: 8px 8px 0 var(--ink); padding: clamp(28px, 6vw, 56px); }
+.final h2 { max-width: 14em; }
+.final p { margin: 14px 0 26px; max-width: 30em; }
+.final .btn { background: var(--ink); color: var(--pink); }
+.final .btn:hover { background: #1c2026; }
+
+footer { padding: 36px 0 56px; color: var(--soft); font-size: .92rem; }
+footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+
+@media (min-width: 920px) {
+  .hero .wrap { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); }
+  .chores .wrap { grid-template-columns: 1fr 1fr; align-items: center; }
+  .how .wrap { grid-template-columns: 340px minmax(0, 1fr); gap: 72px; }
+  .how .head { position: sticky; top: 90px; align-self: start; }
+  .try .wrap, .price .wrap, .honest .wrap { grid-template-columns: 1fr 1.15fr; gap: 64px; }
+}
+@media (max-width: 640px) {
+  .nav a:not(.btn) { display: none; }
+  .stage { min-height: 400px; }
+  .rcard { display: none; }
+  .n1 { display: none; }
+  .email { position: relative; top: 0; width: 100%; }
+  .n2 { position: static; margin-top: 16px; }
+  section { padding: 60px 0; }
+  .hero { padding: 40px 0 56px; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="wrap">
+    <a class="logo" href="#top">
+      <span class="mark" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#0d0f12" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4l2.5 8L8 6l3.5 6L14 4"/></svg></span>
+      WorkDey
+    </a>
+    <nav class="nav" aria-label="Main">
+      <a href="#how">How it works</a>
+      <a href="#try">See a match</a>
+      <a href="#price">Price</a>
+      <a href="app.html#/signin">Sign in</a>
+      <a class="btn pink" href="app.html#/signin">Get started</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <h1>Stop scrolling for jobs. Let the good ones find you.</h1>
+        <p class="lead">Tell WorkDey what you can do once. It checks the job boards while you get on with your day, keeps only the jobs that truly fit your CV, and emails you a reply and cover letter you can send in a minute.</p>
+        <div class="cta">
+          <a class="btn pink" href="app.html#/signin">Set up my profile</a>
+          <a class="btn" href="#try">See what a match looks like</a>
+        </div>
+        <p class="fine">Built for job seekers in Nigeria. NYSC, HND, BSc, Lagos, Abuja and remote roles all make sense to it.</p>
+      </div>
+
+      <div class="stage" aria-label="Example of the email and results page you get">
+        <div class="email">
+          <div class="stripes"></div>
+          <div class="in">
+            <div class="lg"><span class="mark"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#0d0f12" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4l2.5 8L8 6l3.5 6L14 4"/></svg></span> WorkDey</div>
+            <h3>3 new matches</h3>
+            <p><b>Junior Data Analyst</b>, Kora Logistics. Score 86.</p>
+            <p>SQL, Excel and Power BI match your CV. Packs drafted for all 3.</p>
+            <span class="pill">View matches</span>
+          </div>
+          <div class="foot">$0.25 for this run. Next run 16:05.</div>
+        </div>
+        <div class="rcard" aria-hidden="true">
+          <div class="top">
+            <div class="t"><small>MYJOBMAG, 9H AGO</small><b>Junior Data Analyst</b><span>Kora Logistics, Yaba</span></div>
+            <div class="sc"><b>86</b><span>FIT</span></div>
+          </div>
+          <div class="bd"><i>Cover letter ready</i>Dear Hiring Team at Kora Logistics, I am applying for the Junior Data Analyst role in Yaba...</div>
+        </div>
+        <div class="note n1">
+          <svg width="60" height="46" viewBox="0 0 60 46" fill="none" stroke="#c2185b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M56 40C40 40 14 32 8 8M8 8l-1 12M8 8l12 4"/></svg>
+          tap the button and the reply is already written
+        </div>
+        <div class="note n2">this is all that lands in your inbox</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="chores" aria-labelledby="chores-h">
+    <div class="wrap">
+      <div>
+        <h2 id="chores-h">The part of job hunting that wears you out</h2>
+      </div>
+      <div>
+        <ul>
+          <li>Opening six job sites every morning</li>
+          <li>Copying details into your notes app</li>
+          <li>Rewriting your CV for each role</li>
+          <li>Staring at a blank cover letter</li>
+          <li>Wondering if the post is even real</li>
+        </ul>
+        <p>WorkDey does all of that. <b>You review and press send.</b></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="how" id="how" aria-labelledby="how-h">
+    <div class="wrap">
+      <div class="head">
+        <p class="kicker">how it works</p>
+        <h2 id="how-h">Set it up once. It keeps working.</h2>
+        <p>Five steps, and only the first one is yours.</p>
+      </div>
+      <ol class="steps">
+        <li>
+          <span class="n" aria-hidden="true">1</span>
+          <h3>Connect</h3>
+          <p>Paste your CV text and add your skills. Pick the roles you want, where you can work, and how often you want to hear from us.</p>
+        </li>
+        <li>
+          <span class="n" aria-hidden="true">2</span>
+          <h3>We scan while you sleep</h3>
+          <p>WorkDey runs by itself on a schedule. It reads MyJobMag, Jobberman and remote job feeds, drops reposts and scams, and keeps the posts that fit your profile.</p>
+          <span class="aside">LinkedIn, X and Instagram posts are coming next.</span>
+        </li>
+        <li>
+          <span class="n" aria-hidden="true">3</span>
+          <h3>Get jobs in your inbox</h3>
+          <p>You get a short email with your best match and why it fits. No feed to scroll, no site to check.</p>
+        </li>
+        <li>
+          <span class="n" aria-hidden="true">4</span>
+          <h3>Review and apply</h3>
+          <p>Open the email, read the jobs, copy the reply or cover letter we drafted, and open the original post to apply.</p>
+        </li>
+        <li class="last">
+          <span class="n" aria-hidden="true">5</span>
+          <h3>Improve your CV</h3>
+          <p>Each of your top jobs comes with 3 to 5 changes to make your CV fit it, plus a rewritten summary you can copy.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="try" id="try" aria-labelledby="try-h">
+    <div class="wrap">
+      <div>
+        <p class="kicker">what you get for each job</p>
+        <h2 id="try-h">A reply, a cover letter and CV tips. Ready.</h2>
+        <p class="sub">This is a real example from our test profile. Click through the tabs and try the copy button.</p>
+      </div>
+      <div class="demo">
+        <div class="top">
+          <div class="t"><small>MYJOBMAG, 9H AGO</small><b>Junior Data Analyst</b><span>Kora Logistics, Yaba, Lagos</span></div>
+          <div class="sc"><b>86</b><span>FIT</span></div>
+        </div>
+        <ul class="why"><li>SQL, Excel and Power BI match your CV</li><li>Entry level role in Lagos</li></ul>
+        <div class="tabs">
+          <div class="seg" role="tablist" aria-label="Drafts">
+            <button type="button" role="tab" aria-selected="true" data-tab="letter">Cover letter</button>
+            <button type="button" role="tab" aria-selected="false" data-tab="reply">Reply</button>
+            <button type="button" role="tab" aria-selected="false" data-tab="cv">CV tips</button>
+          </div>
+          <button type="button" class="copy" id="copy">Copy</button>
+        </div>
+        <div class="txt" id="txt" role="tabpanel"></div>
+        <div class="draft"><b>Draft.</b> Review before sending.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="honest" aria-labelledby="honest-h">
+    <div class="wrap">
+      <div>
+        <p class="kicker">no surprises</p>
+        <h2 id="honest-h">It only says what your CV says.</h2>
+      </div>
+      <div class="rules">
+        <div><b>Nothing made up</b><span>Replies and cover letters use facts from your CV and profile only. If it is not there, it is not written.</span></div>
+        <div><b>You always press send</b><span>WorkDey never applies for you. You read every draft first.</span></div>
+        <div><b>Scams get dropped</b><span>Posts that ask for money before an interview never reach your inbox.</span></div>
+        <div><b>No repeats</b><span>You will not see the same job twice, even if it is posted on two sites.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="price" id="price" aria-labelledby="price-h">
+    <div class="wrap">
+      <div>
+        <p class="kicker">what it costs</p>
+        <h2 id="price-h">You pay when it finds something.</h2>
+        <p class="sub">Nothing for scanning. You pay a tiny amount for each verified match, and more for each application pack we write for you.</p>
+      </div>
+      <div class="pricecol">
+      <div class="receipt" aria-label="What each step costs">
+        <div class="r"><span>Verified match found</span><span>$0.002 each</span></div>
+        <div class="r"><span>Result</span><span>$0.01 each</span></div>
+        <div class="r"><span>Application pack drafted</span><span>$0.50 each</span></div>
+        <div class="r"><span>Actor start</span><span>$0.00005</span></div>
+        <hr>
+        <div class="r"><span>5 matches, 5 results, 3 packs</span><span></span></div>
+        <div class="tot"><span>A typical run</span><b>$1.56</b></div>
+        <div class="day">One run a day costs about $1.56. Every 5 hours is about $7.50 a day.</div>
+      </div>
+      <p class="tiny">Most of the cost is the application pack, which is the part that saves you the writing. Fewer packs per run costs less.</p>
+      </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="final">
+    <div class="wrap">
+      <div class="box">
+        <h2>Your next job could already be posted.</h2>
+        <p>It takes about five minutes to set up. After that, WorkDey checks for you.</p>
+        <a class="btn" href="app.html#/signin">Set up my profile</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>WorkDey Match Agent. Built for the Apify x She Code Africa BuildHer Hackathon 2026.</span>
+    <span>Drafts are suggestions. Check every detail before you apply.</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var data = {
+    letter: "Dear Hiring Team at Kora Logistics,\n\nI am applying for the Junior Data Analyst role in Yaba. I hold a BSc in Statistics from the University of Lagos and completed NYSC in 2025.\n\nAs a Data Analyst Intern at Paylink Microfinance, I built weekly loan repayment dashboards in Excel and Power BI, which is close to the reporting work in your post. I also cleaned 40,000 customer records with SQL, so I am comfortable preparing messy data before it is reported.\n\nI would welcome the chance to discuss how I can support your data team. Thank you for your time.\n\nYours sincerely,\nAdaeze Okafor",
+    reply: "Hello, I saw your post for a Junior Data Analyst in Yaba. I built weekly loan dashboards in Excel and Power BI at Paylink Microfinance and cleaned 40,000 records with SQL. My CV is attached. Could we speak this week?",
+    cv: "1. Put SQL and Power BI first in your skills list. Both are in the post.\n2. Add the result to your Paylink line: what the dashboards helped the team decide.\n3. Move NYSC completed 2025 up to your education line.\n4. Mention the 30 learners you taught. It shows you can explain data.\n\nRewritten summary:\nData-minded statistics graduate with 1 year of hands-on reporting in Excel, SQL and Power BI, ready to support a logistics data team."
+  };
+  var tab = "letter", box = document.getElementById("txt"), copy = document.getElementById("copy");
+  var tabs = document.querySelectorAll("[data-tab]");
+  function show() {
+    box.textContent = data[tab];
+    tabs.forEach(function (b) { b.setAttribute("aria-selected", b.dataset.tab === tab ? "true" : "false"); });
+  }
+  tabs.forEach(function (b) { b.addEventListener("click", function () { tab = b.dataset.tab; show(); }); });
+  copy.addEventListener("click", function () {
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(data[tab]).then(function () {
+      copy.textContent = "Copied"; copy.classList.add("done");
+      setTimeout(function () { copy.textContent = "Copy"; copy.classList.remove("done"); }, 1800);
+    }, function () {});
+  });
+  show();
+})();
+</script>
+</body>
+</html>

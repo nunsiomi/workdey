@@ -1,0 +1,74 @@
+{
+  "title": "WorkDey Career Agent Input",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "fullName": {
+      "title": "Full Name",
+      "type": "string",
+      "description": "Your full name for personalizing outreach materials and the dashboard.",
+      "editor": "textfield",
+      "default": "Olamide Lawal",
+      "prefill": "Olamide Lawal"
+    },
+    "email": {
+      "title": "Email Address (Optional)",
+      "type": "string",
+      "description": "Where to send your application pack and match report. Leave empty to skip email.",
+      "editor": "textfield"
+    },
+    "targetRoles": {
+      "title": "Target Roles / Keywords",
+      "type": "array",
+      "description": "Job titles or target domains (e.g., Data Scientist, UI/UX Designer, Product Designer).",
+      "editor": "stringList",
+      "minItems": 1,
+      "default": ["Data Scientist", "Machine Learning Engineer"],
+      "prefill": ["Data Scientist", "Machine Learning Engineer"]
+    },
+    "preferredLocations": {
+      "title": "Preferred Work Mode / Location",
+      "type": "array",
+      "description": "e.g., Remote, Lagos, Nigeria, Worldwide, Hybrid.",
+      "editor": "stringList",
+      "default": ["Remote", "Nigeria", "Worldwide"],
+      "prefill": ["Remote", "Nigeria", "Worldwide"]
+    },
+    "cvText": {
+      "title": "CV / Resume Text",
+      "type": "string",
+      "description": "Paste your full CV or career summary text.",
+      "editor": "textarea",
+      "minLength": 50,
+      "default": "Machine learning and software engineer experienced in Python, PyTorch, predictive modeling, data pipelines, and embedded IoT architectures.",
+      "prefill": "Machine learning and software engineer experienced in Python, PyTorch, predictive modeling, data pipelines, and embedded IoT architectures."
+    },
+    "minScore": {
+      "title": "Minimum Compatibility Score (%)",
+      "type": "integer",
+      "description": "Only jobs matching at or above this score threshold will be included.",
+      "minimum": 1,
+      "maximum": 100,
+      "default": 60,
+      "prefill": 50
+    },
+    "maxPacks": {
+      "title": "Maximum Application Packs to Draft",
+      "type": "integer",
+      "description": "How many tailored cover letters and recruiter DMs to generate for top matches.",
+      "minimum": 1,
+      "maximum": 5,
+      "default": 2,
+      "prefill": 1
+    },
+    "resetMemory": {
+      "title": "Reset Memory (Ignore Previously Seen Jobs)",
+      "type": "boolean",
+      "description": "Enable this to re-evaluate and clear previously saved job history. Turn off for scheduled runs so you only get new jobs.",
+      "default": false,
+      "prefill": true
+    },
+    
+  },
+  "required": ["fullName", "targetRoles", "cvText"]
+}

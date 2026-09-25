@@ -1,95 +1,301 @@
-# WorkDey Match Agent
+# WorkDey: Autonomous AI Career Scout & Match Agent
 
-An AI agent, built as an Apify Actor, that watches job boards for a job seeker, picks the jobs that truly fit her profile, and drafts her reply, cover letter and CV tips. It takes her profile (skills, education, experience and CV), checks public Nigerian and remote job boards on a schedule she picks, and scores each new post against her real profile. For the 2 or 3 best fits, it emails her a short alert linking to a results page with a ready reply, a tailored cover letter, and CV update tips — all written using only facts from her own CV.
+**WorkDey** is an AI-powered career agent that discovers live job opportunities, evaluates candidate-job fit, screens listings for scam signals, and generates tailored application materials for relevant roles.
 
-Built for the [Apify x She Code Africa BuildHer Hackathon 2026](https://apify.com/store) (theme: Ship and Earn Africa, Jobs Board track), from the TypeScript [Crawlee](https://crawlee.dev/) Actor template used in the [workshop example](https://github.com/kazadoiyul/sca2026-demo), then customized.
+It helps candidates reduce the time spent searching through job listings, assessing opportunities, and preparing individual applications.
 
-## How we're different
 
-Other job tools on the Apify Store only collect job posts. WorkDey Match Agent does the hard part: it finds the jobs that actually fit and writes the application.
+## What is WorkDey?
 
-| | Job scrapers on the Store | WorkDey Match Agent |
-| --- | --- | --- |
-| Input | Keywords or a search URL | Her full profile and CV |
-| Output | A long list of raw posts | 2 or 3 jobs that fit, with reasons |
-| Decides what fits | No | Yes, with a score and plain reasons |
-| Filters scams and non-jobs | No | Yes |
-| Writes the application | No | Reply, cover letter and CV tips |
-| Stays honest | Not relevant | Uses only facts from her CV |
-| Runs by itself | User must set it up and read results | Schedule plus a short email |
-| Built for | General use | African, mainly Nigerian, job seekers |
+WorkDey automates the early stages of the job search process.
 
-> "There are job scrapers on Apify already. WorkDey Match Agent is the layer nobody has built: it reads your real profile, finds the 2 or 3 jobs that actually fit, and hands you a ready reply and cover letter, using only facts from your CV."
+It:
 
-## How it works
+1. **Discovers live jobs** from supported job feeds.
+2. **Screens listings for scam signals** before they are considered for matching.
+3. **Evaluates CV-to-job fit** using AI and produces a compatibility score.
+4. **Generates application packs** for qualifying matches.
+5. **Creates an HTML dashboard** containing the results and application materials.
+6. **Sends application packs by email** when an email address is provided.
+7. **Remembers previously processed jobs** to avoid repeatedly processing the same listings.
 
-**The job seeker's journey**, from setup to applying:
 
-![What the job seeker does, from setup to applying](media/journey.png)
+## Key Features
 
-**The system flow inside the Actor**, run every time it starts:
+### Live Job Discovery
 
-![The steps the Actor runs every time it starts](media/arch.png)
+WorkDey currently retrieves job listings from:
 
-Every time the Actor runs, it works through seven steps:
+* RemoteOK
+* Remotive
+* BambooHR
 
-1. **Read profile.** Reads the input: skills, education, experience, target roles, location, work type and CV text.
-2. **Collect posts.** Scrapes new posts from the selected public job sources into one standard shape (title, company, location, text, link, date, source).
-3. **Clean and dedupe.** Removes the same job seen on two sources and skips any job link already sent to this user in an earlier run.
-4. **Real job check.** A cheap AI call marks each post as Job, Gig, Not a job or Likely scam. Only Job and Gig move on; posts asking for payment before an interview are dropped.
-5. **Score.** Each surviving post gets a fit score from 0 to 100 and 1 or 2 short reasons (e.g. "Matches your Excel and bookkeeping skills; based in Lagos"). A `match-found` event is charged for each post above the minimum score.
-6. **Draft.** For the top matches only, the AI writes a reply, a cover letter and CV tips. An `application-pack-drafted` event is charged for each pack.
-7. **Deliver.** Results go to the dataset, an HTML results page is saved, and a short email is sent with a link to that page.
+Listings from these sources are normalized and processed through the same evaluation workflow.
 
-To run it every few hours, save the input as an Actor task and add an [Apify Schedule](https://docs.apify.com/platform/schedules) (for example, every 5 hours) — no extra code needed.
+### Scam Screening
 
-## Pricing (Pay Per Event)
+WorkDey checks job listings for signals commonly associated with employment scams.
 
-We charge for the value the agent creates, not for raw scraping — scraped posts are free, since that's what existing scrapers already sell.
+Examples include:
 
-| Event | Suggested price | When it's charged |
-| --- | --- | --- |
-| `match-found` | $0.02 | Each job that passes the real-job check and scores above `minScore`. |
-| `application-pack-drafted` | $0.05 | Each full pack (reply, cover letter, CV tips) written for a top match. |
+* Requests for upfront payments
+* Training or interview fees
+* Suspicious recruitment requirements
+* Other patterns identified by the scam-screening logic
 
-Example: a run with 5 matches and 3 packs costs the user $0.25. At every 5 hours, that's about $1.20/day — less than a single printed CV. Final prices will be set after measuring real LLM cost. Events are declared in the Actor's monetization settings and charged in code with `Actor.charge()`.
+Scam screening provides a risk signal. It does not guarantee that a listing is legitimate.
 
-## Quick start
+### CV-to-Job Matching
 
-This repo currently holds the basic Actor scaffold — input/output schemas and feature code are still to come.
+WorkDey compares a candidate's CV with the available job information and produces a compatibility score from **0 to 100**.
 
-Install dependencies, then start the Actor:
+The evaluation can consider:
+
+* Relevant skills
+* Experience overlap
+* Technical requirements
+* Role alignment
+* Information contained in the job description
+
+Candidates can set their own minimum score threshold.
+
+### Application Pack Generation
+
+For qualifying matches, WorkDey generates a personalized application pack containing:
+
+* Recruiter outreach message
+* Tailored cover letter
+* CV improvement suggestions
+* Facts used from the candidate's CV
+
+The generated materials are grounded in information provided in the candidate's CV rather than inventing credentials or experience.
+
+### Persistent Job Memory
+
+WorkDey maintains a persistent record of previously processed job IDs using an Apify Key-Value Store.
+
+This allows later runs to focus on jobs that have not already been processed.
+
+The `resetMemory` option allows previously seen jobs to be re-evaluated when needed.
+
+### HTML Dashboard
+
+Each run generates an `OUTPUT_DASHBOARD.html` containing the results.
+
+The dashboard includes:
+
+* Job information
+* Match scores
+* Scam status
+* Fit information
+* Direct job links
+* Recruiter outreach messages
+* Cover letters
+* CV suggestions
+
+### Email Delivery
+
+Users can optionally provide an email address.
+
+When application packs are generated, WorkDey sends a consolidated report using Apify's `send-mail` Actor.
+
+The email contains the generated application materials and a link to the WorkDey dashboard.
+
+
+## Input Parameters
+
+| Field                | Type    | Required | Description                                                                   |
+| -------------------- | ------- | -------: | ----------------------------------------------------------------------------- |
+| `fullName`           | String  |      Yes | Candidate's name used to personalize application materials.                   |
+| `cvText`             | String  |      Yes | Plain-text CV or resume content used for matching and application generation. |
+| `targetRoles`        | Array   |      Yes | Job titles or keywords to search for.                                         |
+| `email`              | String  |       No | Email address for receiving the application report.                           |
+| `preferredLocations` | Array   |       No | Preferred locations or work modes such as `Remote`, `Lagos`, or `Worldwide`.  |
+| `minScore`           | Integer |       No | Minimum compatibility score from 1 to 100. Default: `60`.                     |
+| `maxPacks`           | Integer |       No | Maximum number of application packs generated per run. Default: `2`.          |
+| `resetMemory`        | Boolean |       No | Re-evaluate previously processed jobs when set to `true`.                     |
+
+---
+
+## Example Input
+
+```json
+{
+  "fullName": "Olamide Lawal",
+  "email": "candidate@example.com",
+  "targetRoles": [
+    "Machine Learning Engineer",
+    "Data Scientist"
+  ],
+  "preferredLocations": [
+    "Remote",
+    "Lagos",
+    "Worldwide"
+  ],
+  "cvText": "Electronic & Electrical Engineering undergraduate with experience in machine learning, Python, PyTorch, medical imaging, embedded systems, and edge ML deployments.",
+  "minScore": 60,
+  "maxPacks": 2,
+  "resetMemory": true
+}
+```
+
+## Outputs
+
+### 1. Processed Dataset
+
+Processed jobs are saved to the Actor's default dataset.
+
+Results can include:
+
+* Job title
+* Company
+* Location
+* Job URL
+* Source
+* Match score
+* Scam status
+* Scam reason
+* Fit reasons
+* Application pack
+* Processing timestamp
+
+### 2. HTML Dashboard
+
+WorkDey generates:
+
+```text
+OUTPUT_DASHBOARD.html
+```
+
+The dashboard provides a visual view of the processed jobs and generated application materials.
+
+### 3. Email Application Report
+
+When an email address is provided and application packs are generated, WorkDey sends an email containing:
+
+* Matched roles
+* Match scores
+* Job links
+* Recruiter outreach messages
+* Cover letters
+* CV suggestions
+* Facts used from the candidate's CV
+* Dashboard link
+
+---
+
+## How It Works
+
+```text
+Candidate CV + Target Roles
+            │
+            ▼
+       Job Discovery
+            │
+            ▼
+       Job Memory
+            │
+            ▼
+      Scam Screening
+            │
+            ▼
+      CV-Job Evaluation
+            │
+            ▼
+       Match Scoring
+            │
+            ▼
+   Application Pack Generation
+            │
+       ┌────┴────┐
+       ▼         ▼
+   Dashboard   Email
+       │         │
+       └────┬────┘
+            ▼
+        Final Results
+```
+
+## Monetization
+
+WorkDey uses Apify's pay-per-event monetization model.
+
+The current events are:
+
+| Event                    |    Price |
+| ------------------------ | -------: |
+| Verified Match Found     |   $0.002 |
+| Result                   |    $0.01 |
+| Application Pack Drafted |    $0.50 |
+| Actor Start              | $0.00005 |
+
+Application packs are generated and charged through the Actor's application-pack billing flow.
+
+---
+
+## Important Notes
+
+WorkDey is a career assistance tool, not a hiring platform.
+
+A match score is an estimate based on the information available in the job listing and candidate CV. It does not guarantee that a candidate meets every requirement or that an employer will respond.
+
+Scam screening identifies potential risk signals but cannot guarantee that a job posting is legitimate.
+
+Candidates should review job descriptions and independently verify employers before submitting personal information or applying.
+
+
+## Technology
+
+WorkDey is built with:
+
+* **TypeScript**
+* **Apify Actors**
+* **Apify Key-Value Stores**
+* **Apify Datasets**
+* **Groq**
+* **HTML/CSS**
+
+
+## Project Structure
+
+```text
+src/
+├── main.ts
+├── ai.ts
+├── email.ts
+└── types.ts
+
+.actor/
+└── actor.json
+
+input_schema.json
+package.json
+README.md
+tsconfig.json
+```
+
+## 🚀 Running Locally
+
+Install dependencies:
 
 ```bash
 npm install
-
-apify run
 ```
 
-Once your Actor is ready, push it to the Apify Console:
+Build the Actor:
 
 ```bash
-apify login # first, you need to log in if you haven't already done so
-
-apify push
+npm run build
 ```
 
-## Project structure
+Run the Actor with Apify:
 
-```text
-.actor/
-└── actor.json # Actor config: name, version, env vars, runtime settings
-docs/ # PRD and hackathon program brief
-media/ # Diagrams used in this README
-src/
-└── main.ts # Actor entry point
-Dockerfile # Container image definition
+```bash
+apify call
 ```
 
-For more information, see the [Actor definition](https://docs.apify.com/platform/actors/development/actor-definition) documentation.
+## Project Goal
 
-## Built with
+WorkDey is designed to make the early stages of job searching more structured and less repetitive.
 
-- **[Apify SDK](https://docs.apify.com/sdk/js)** — toolkit for building [Actors](https://apify.com/actors)
-- **[Crawlee](https://crawlee.dev/)** — web scraping and browser automation library
-- **[Pay Per Event (PPE)](https://docs.apify.com/actors/publishing/monetize/pay-per-event)** — Apify's usage-based monetization method
+**Find relevant opportunities. Understand your fit. Prepare better applications.**

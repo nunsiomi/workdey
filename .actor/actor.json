@@ -1,13 +1,19 @@
 {
-    "$schema": "https://apify.com/schemas/v1/actor.ide.json",
-    "actorSpecification": 1,
-    "name": "workdey-match-agent",
-    "title": "WorkDey Match Agent",
-    "description": "Reads a job seeker's profile and CV, matches new posts from public job boards against it, and drafts a ready reply, cover letter and CV tips for the best fits.",
-    "version": "0.0",
-    "buildTag": "latest",
-    "meta": {
-        "templateId": "ts-crawlee-cheerio"
-    },
-    "dockerfile": "../Dockerfile"
+	"$schema": "https://apify.com/schemas/v1/actor.ide.json",
+	"actorSpecification": 1,
+	"name": "workdey-career-agent",
+    "title": "WorkDey: Autonomous AI Career Scout & Application Agent",
+	"description": "Autonomous AI career agent that discovers verified tech roles across global feeds and African ATS boards, screens out scam postings, calculates CV fit, and drafts tailored application packs.",
+	"version": "0.0",
+	"buildTag": "latest",
+	"meta": {
+		"templateId": "ts-crawlee-cheerio",
+		"generatedBy": "Claude Code with Claude Sonnet 5"
+	},
+	"inputSchema": "./input_schema.json",
+	"outputSchema": "./output_schema.json",
+	"storages": {
+		"dataset": "./dataset_schema.json"
+	},
+	"dockerfile": "../Dockerfile"
 }
