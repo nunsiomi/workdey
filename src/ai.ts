@@ -222,7 +222,14 @@ export async function generateApplicationPack(
     post: JobPost,
     candidate: CandidateInput
 ): Promise<ApplicationPack> {
-    const formal = /linkedin|bamboo/i.test(post.source);
+    // Employer career pages and job boards get a professional tone; a social post
+    // or a demand lead is answered like a direct message.
+    const formal =
+        post.postType !== 'social-signal' &&
+        (post.sourceCategory === 'ats' ||
+            post.sourceCategory === 'nigerian-board' ||
+            post.sourceCategory === 'remote-board' ||
+            /linkedin|bamboo/i.test(post.source));
     const tone = formal
         ? 'professional and polite'
         : 'friendly, direct and natural, like a good WhatsApp or DM message';

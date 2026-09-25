@@ -86,7 +86,11 @@ function matchCard(job: ProcessedJob, i: number): string {
         <span class="badge score">${esc(job.score)}/100</span>
       </div>
       <p class="meta">${esc(job.company)} &middot; ${esc(job.location)} &middot; ${esc(job.source)}</p>
-      <p><span class="badge ${fresh.cls}">${esc(fresh.label)}</span></p>
+      <p><span class="badge ${fresh.cls}">${esc(fresh.label)}</span>${
+          job.verifyManually
+              ? ' <span class="badge warm">Social lead: verify manually</span>'
+              : ''
+      }</p>
       ${reasons}
       <p><a class="btn" href="${esc(safeUrl(job.url))}" target="_blank" rel="noopener noreferrer">View listing</a></p>
       ${packHtml(job, i)}

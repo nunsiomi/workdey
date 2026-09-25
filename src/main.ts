@@ -1,10 +1,13 @@
 import { createHash } from 'node:crypto';
 import { Actor } from 'apify';
 import { CandidateInput, JobPost, ProcessedJob } from './types.js';
-import { fetchLiveJobsForRoles } from './scraper.js';
+import { countReached, fetchLiveJobsForRoles } from './scraper.js';
 import { evaluateJob, generateApplicationPack } from './ai.js';
 import { renderDashboard } from './dashboard.js';
 import { sendApplicationEmail } from './email.js';
+import { relevance, roleKeywords, selectDiverse } from './selection.js';
+import { canonicalUrl, mapLimit } from './sources/common.js';
+import { enrichNigerianJob } from './sources/nigerianBoards.js';
 
 // IMPORTANT: these must match the event names in
 // Apify Console > your Actor > Publication > Monetization, exactly.
@@ -15,34 +18,16 @@ const EVENT_PACK = 'application-pack-drafted';
 const MAX_JOBS_TO_EVALUATE = 15;
 // How many LLM evaluations run at the same time.
 const CONCURRENCY = 10;
-// Cap the memory list so it cannot grow forever.
-const MAX_SEEN_IDS = 2000;
+// Cap the memory list so it cannot grow forever (each job stores its id and its link).
+const MAX_SEEN_IDS = 4000;
+// A run that reaches fewer sources than this is treated as a failed sweep.
+const MIN_SOURCES_REACHED = 6;
 
 type EvalResult = Awaited<ReturnType<typeof evaluateJob>>;
 type Evaluated = { job: JobPost; result: EvalResult };
 
-/** All string fields of a job joined into one lowercase blob for keyword checks. */
-function jobText(job: JobPost): string {
-    return Object.values(job as unknown as Record<string, unknown>)
-        .filter((v): v is string => typeof v === 'string')
-        .join(' ')
-        .toLowerCase();
-}
-
-/** Split target roles into unique lowercase keywords, e.g. "Machine Learning Engineer" -> machine, learning, engineer. */
-function roleKeywords(roles: string[]): string[] {
-    const words = roles
-        .join(' ')
-        .toLowerCase()
-        .split(/[^a-z0-9+#]+/)
-        .filter((w) => w.length > 2);
-    return [...new Set(words)];
-}
-
-function relevance(job: JobPost, keywords: string[]): number {
-    const text = jobText(job);
-    return keywords.reduce((n, k) => (text.includes(k) ? n + 1 : n), 0);
-}
+/** A job counts as already sent if either its id or its original link was seen before. */
+const seenKeys = (job: JobPost): string[] => [job.id, `url:${canonicalUrl(job.url)}`];
 
 /** Stable per-candidate key so each person's seen-jobs list is separate. */
 function memoryKey(input: CandidateInput): string {
@@ -173,29 +158,60 @@ await Actor.main(async () => {
             : `[WorkDey Memory] Loaded ${seen.size} previously seen job IDs.`
     );
 
-    // 1. Fetch live jobs
-    let rawJobs: JobPost[];
+    // 1. Sweep every source category
+    let ingestion: Awaited<ReturnType<typeof fetchLiveJobsForRoles>>;
     try {
-        rawJobs = await fetchLiveJobsForRoles(targetRoles, Boolean(input.includeDemoListings));
+        ingestion = await fetchLiveJobsForRoles(targetRoles, {
+            includeDemoListings: Boolean(input.includeDemoListings),
+            maxJobAgeDays: input.maxJobAgeDays,
+            skills: input.skills,
+            includeSocialSignals: input.includeSocialSignals,
+            xBearerToken: input.xBearerToken
+        });
     } catch (error) {
         throw new Error(
             `Could not fetch job feeds right now: ${(error as Error).message}`
         );
     }
-    console.log(`[WorkDey Ingestion] Discovered ${rawJobs.length} live job postings.`);
+    const rawJobs = ingestion.jobs;
+    const sourcesReached = countReached(ingestion.reports);
+    console.log(`[WorkDey Ingestion] Discovered ${rawJobs.length} live job postings from ${sourcesReached} sources.`);
+    if (sourcesReached < MIN_SOURCES_REACHED) {
+        console.warn(
+            `[WorkDey Ingestion] Only ${sourcesReached} sources answered (expected at least ${MIN_SOURCES_REACHED}). ` +
+                'This sweep is incomplete: check the network or the run report.'
+        );
+    }
 
-    // 2. Keep only new jobs, then shortlist the most relevant ones for the LLM
-    const fresh = rawJobs.filter((job) => !seen.has(job.id));
+    // The run report makes a single-site collapse visible at a glance.
+    const runStore = await Actor.openKeyValueStore();
+    await runStore.setValue('RUN_REPORT', {
+        generatedAt: new Date().toISOString(),
+        sourcesReached,
+        totalJobs: rawJobs.length,
+        dropped: ingestion.dropped,
+        sources: ingestion.reports
+    });
+
+    // 2. Keep only new jobs, then shortlist the most relevant ones for the LLM,
+    //    with no single source allowed to fill more than ~30% of the list.
+    const fresh = rawJobs.filter((job) => !seenKeys(job).some((k) => seen.has(k)));
     const keywords = roleKeywords(targetRoles);
+    const preferred = input.preferredLocations ?? input.locations ?? [];
 
-    const shortlist = fresh
-        .map((job) => ({ job, score: relevance(job, keywords) }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, MAX_JOBS_TO_EVALUATE)
-        .map((x) => x.job);
+    const picked = selectDiverse(fresh, MAX_JOBS_TO_EVALUATE, (job) =>
+        relevance(job, keywords, preferred)
+    );
+    // Listing snippets are short; pull the full posting text for the few we will evaluate.
+    const shortlist = await mapLimit(picked, 4, (job) => enrichNigerianJob(job));
 
+    const bySource = shortlist.reduce<Record<string, number>>((acc, j) => {
+        acc[j.source] = (acc[j.source] ?? 0) + 1;
+        return acc;
+    }, {});
     console.log(
-        `[WorkDey Ingestion] ${fresh.length} new postings; evaluating the top ${shortlist.length}.`
+        `[WorkDey Ingestion] ${fresh.length} new postings; evaluating the top ${shortlist.length}. ` +
+            `Shortlist by source: ${JSON.stringify(bySource)}`
     );
 
     if (shortlist.length === 0) {
@@ -277,11 +293,11 @@ await Actor.main(async () => {
     // 6. Save free results first: scams and rejected roles are never charged
     for (const e of scams) {
         await save(toProcessed(e, 'SCAM'));
-        seen.add(e.job.id);
+        seenKeys(e.job).forEach((k) => seen.add(k));
     }
     for (const e of rejected) {
         await save(toProcessed(e, 'REJECTED'));
-        seen.add(e.job.id);
+        seenKeys(e.job).forEach((k) => seen.add(k));
     }
 
     // 7. Save matches, charging only after successful delivery
@@ -297,19 +313,23 @@ for (const e of matched) {
         eventName: EVENT_MATCH
     });
 
-    if (matchCharge.eventChargeLimitReached) {
+    // "eventChargeLimitReached" is also true right AFTER a successful charge that
+    // used up the budget, so success is judged by chargedCount, not by that flag.
+    if (matchCharge.chargedCount < 1) {
         console.warn(
             `[WorkDey Billing] Match charge limit reached. Stopping delivery.`
         );
         limitReached = true;
         break;
     }
+    // This match is paid for and will be delivered, but nothing more can be charged.
+    if (matchCharge.eventChargeLimitReached) limitReached = true;
 
     let applicationPack: ProcessedJob['applicationPack'] | undefined;
 
     // 2. Only generate an application pack after the match has
     // successfully been charged.
-    if (packsDelivered < maxPacks) {
+    if (packsDelivered < maxPacks && !limitReached) {
         await Actor.setStatusMessage(
             `Drafting application pack ${packsDelivered + 1}/${maxPacks}...`
         );
@@ -326,14 +346,16 @@ for (const e of matched) {
                 eventName: EVENT_PACK
             });
 
-            if (packCharge.eventChargeLimitReached) {
+            if (packCharge.chargedCount < 1) {
                 console.warn(
                     `[WorkDey Billing] Application pack charge limit reached.`
                 );
                 limitReached = true;
             } else {
+                // Charged successfully, so the customer always receives the pack.
                 applicationPack = generatedPack;
                 packsDelivered++;
+                if (packCharge.eventChargeLimitReached) limitReached = true;
             }
         } catch (error) {
             console.error(
@@ -353,14 +375,13 @@ for (const e of matched) {
         )
     );
 
-    seen.add(e.job.id);
+    seenKeys(e.job).forEach((k) => seen.add(k));
     matchesDelivered++;
 }
     // 8. Save memory (only jobs we actually processed are marked as seen)
     await store.setValue(key, [...seen].slice(-MAX_SEEN_IDS));
 
     // 9. Build the dashboard (saved in this run's own default store, separate from the named memory store)
-    const runStore = await Actor.openKeyValueStore();
     await runStore.setValue(
         'OUTPUT_DASHBOARD.html',
         renderDashboard(results, { fullName, targetRoles }),
@@ -393,7 +414,7 @@ for (const e of matched) {
 
     const summary =
         `Done: ${matchesDelivered} matches, ${scams.length} scams flagged, ` +
-        `${packsDelivered} application packs.` +
+        `${packsDelivered} application packs, from ${sourcesReached} sources.` +
         (limitReached ? ' Stopped early: spending limit reached.' : '');
 
     console.log(`[WorkDey] ${summary}`);

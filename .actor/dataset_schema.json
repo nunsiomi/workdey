@@ -6,19 +6,32 @@
         "overview": {
             "title": "Overview",
             "transformation": {
-                "fields": ["title", "url"]
+                "fields": [
+                    "status",
+                    "score",
+                    "title",
+                    "company",
+                    "location",
+                    "source",
+                    "sourceCategory",
+                    "postedAt",
+                    "verifyManually",
+                    "url"
+                ]
             },
             "display": {
                 "component": "table",
                 "properties": {
-                    "title": {
-                        "label": "Title",
-                        "format": "text"
-                    },
-                    "url": {
-                        "label": "URL",
-                        "format": "link"
-                    }
+                    "status": { "label": "Status", "format": "text" },
+                    "score": { "label": "Fit score", "format": "number" },
+                    "title": { "label": "Title", "format": "text" },
+                    "company": { "label": "Company / poster", "format": "text" },
+                    "location": { "label": "Location", "format": "text" },
+                    "source": { "label": "Source", "format": "text" },
+                    "sourceCategory": { "label": "Source type", "format": "text" },
+                    "postedAt": { "label": "Posted", "format": "date" },
+                    "verifyManually": { "label": "Verify manually", "format": "boolean" },
+                    "url": { "label": "Original link", "format": "link" }
                 }
             }
         }

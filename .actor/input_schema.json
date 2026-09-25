@@ -68,7 +68,27 @@
       "default": false,
       "prefill": true
     },
-    
+    "maxJobAgeDays": {
+      "title": "Maximum Job Age (Days)",
+      "type": "integer",
+      "description": "Ignore listings older than this many days. Listings with an unknown post date are kept.",
+      "minimum": 1,
+      "maximum": 365,
+      "default": 30
+    },
+    "includeSocialSignals": {
+      "title": "Scan Verified X Accounts for Hiring Signals",
+      "type": "boolean",
+      "description": "Looks at public posts from verified X (Twitter) accounts that say they are hiring or need a service you offer. Needs an X API token below; skipped otherwise. Instagram is not scanned because it has no public search that respects its terms. Social leads are marked 'verify manually'.",
+      "default": true
+    },
+    "xBearerToken": {
+      "title": "X (Twitter) API Bearer Token (Optional)",
+      "type": "string",
+      "description": "Your own X API v2 bearer token, used read-only to search public posts from verified accounts. Stored as a secret. Leave empty to skip social signals.",
+      "editor": "textfield",
+      "isSecret": true
+    }
   },
   "required": ["fullName", "targetRoles", "cvText"]
 }

@@ -7,6 +7,16 @@
             "type": "string",
             "title": "Results",
             "template": "{{links.apiDefaultDatasetUrl}}/items"
+        },
+        "dashboard": {
+            "type": "string",
+            "title": "Match dashboard",
+            "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/OUTPUT_DASHBOARD.html"
+        },
+        "runReport": {
+            "type": "string",
+            "title": "Source run report (which sources were reached)",
+            "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/RUN_REPORT"
         }
     }
 }
