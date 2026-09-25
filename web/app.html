@@ -206,6 +206,21 @@ pre.json { background: var(--dim); border: 1.5px solid var(--line); border-radiu
 .acts { display: flex; flex-wrap: wrap; gap: 10px; }
 .cron { font-family: var(--mono); background: #fbe3ec; padding: 1px 6px; border-radius: 5px; }
 
+
+button:disabled { opacity: .55; cursor: not-allowed; }
+.linkbtn.dark { color: var(--ink); font-weight: 700; }
+.who a.linkbtn { text-decoration: none; }
+.spin { display: inline-block; width: 16px; height: 16px; border: 2.5px solid rgba(13,15,18,.25); border-top-color: var(--ink); border-radius: 50%; animation: spin .8s linear infinite; }
+.spin.big { width: 34px; height: 34px; border-width: 4px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.btn.sm { padding: 7px 14px; font-size: .88rem; }
+.statusrow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; padding-top: 16px; border-top: 1px dashed #c3c8d0; }
+.snippet { color: var(--soft); font-size: .92rem; margin: 0 0 14px; max-width: 60ch; }
+.text-box.empty p { color: var(--soft); }
+.err.banner { background: #fdecea; border: 1.5px solid var(--red); border-radius: 10px; padding: 10px 14px; margin: 18px 0 0; }
+.okbanner { background: var(--teal-bg); border: 1.5px solid var(--teal); color: var(--teal); border-radius: 10px; padding: 10px 14px; margin: 18px 0 0; font-weight: 600; }
+.who { flex-wrap: wrap; justify-content: flex-end; }
+
 @media (min-width: 900px) {
   .signin { grid-template-columns: 1.1fr 1fr; gap: 72px; }
   .layout { grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; }
@@ -224,31 +239,45 @@ pre.json { background: var(--dim); border: 1.5px solid var(--line); border-radiu
 <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7.26.10/babel.min.js"></script>
 <script type="text/babel">
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 
-/* Where "Start" sends people. Set this to the published Actor URL from the Apify Store. */
-const ACTOR_URL = "https://console.apify.com/actors";
+/* The WorkDey backend. When served over http(s) from a real host (Vercel), "/api" is proxied to
+   the backend by vercel.json, so cookies stay same-site. Opened from a file or localhost, it calls
+   the backend directly. Override with window.WORKDEY_API = "https://..." before this script. */
+const DIRECT_API = "https://workdey-prod-engine.onrender.com";
+const onRealHost = /^https?:$/.test(window.location.protocol) && !/^(localhost|127\.0\.0\.1)$/.test(window.location.hostname);
+const API_BASE = (window.WORKDEY_API !== undefined ? window.WORKDEY_API : (onRealHost ? "" : DIRECT_API)).replace(/\/+$/, "");
 
 const LOCATIONS = ["Lagos", "Remote", "Abuja", "Port Harcourt", "Ibadan"];
-const SOURCES = [
-  { id: "myjobmag", label: "MyJobMag" },
-  { id: "jobberman", label: "Jobberman" },
-  { id: "remote-rss", label: "Remote jobs (RSS)" },
+const CADENCES = [
+  { h: 1, label: "Hourly" }, { h: 3, label: "3 hours" }, { h: 6, label: "6 hours" },
+  { h: 12, label: "12 hours" }, { h: 24, label: "Daily" },
 ];
-const SCHEDULES = [
-  { id: "3", short: "3 hours", label: "Every 3 hours", cron: "0 */3 * * *" },
-  { id: "5", short: "5 hours", label: "Every 5 hours", cron: "0 */5 * * *" },
-  { id: "24", short: "Daily", label: "Every day", cron: "0 8 * * *" },
-];
-const PRICE_VERIFIED = 0.002, PRICE_RESULT = 0.01, PRICE_PACK = 0.50, PRICE_START = 0.00005, TYPICAL_MATCHES = 5;
 
-function load(key, fallback) {
-  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; }
+class ApiError extends Error {
+  constructor(message, status) { super(message); this.status = status; }
 }
-function save(key, value) {
-  try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch (e) { return false; }
+
+/* One place that talks to the backend. Cookies carry the session, so credentials are always sent. */
+async function api(path, opts) {
+  const o = opts || {};
+  const headers = {};
+  let body;
+  if (o.form) body = o.form;
+  else if (o.body !== undefined) { headers["Content-Type"] = "application/json"; body = JSON.stringify(o.body); }
+  const ctl = new AbortController();
+  const timer = setTimeout(function () { ctl.abort(); }, o.timeout || 30000);
+  let res;
+  try {
+    res = await fetch(API_BASE + path, { method: o.method || (body ? "POST" : "GET"), credentials: "include", headers, body, signal: ctl.signal });
+  } catch (e) {
+    throw new ApiError(e.name === "AbortError" ? "The server took too long to answer. Try again in a moment." : "Can't reach WorkDey right now. Check your connection and try again.", 0);
+  } finally { clearTimeout(timer); }
+  let data = null;
+  try { data = await res.json(); } catch (e) { /* non-JSON body */ }
+  if (!res.ok) throw new ApiError((data && (data.error || data.message)) || "Something went wrong (" + res.status + ").", res.status);
+  return data || {};
 }
-function money(n) { return "$" + n.toFixed(2); }
 
 function useRoute() {
   const [r, setR] = useState(window.location.hash || "#/signin");
@@ -261,6 +290,8 @@ function useRoute() {
 }
 function go(hash) { window.location.hash = hash; }
 
+function reducedMotion() { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } }
+
 function Bar({ user, onOut }) {
   return (
     <div className="bar"><div className="bar-in">
@@ -268,20 +299,33 @@ function Bar({ user, onOut }) {
         <span className="mark" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#0d0f12" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4l2.5 8L8 6l3.5 6L14 4" /></svg></span>
         WorkDey
       </a>
-      {user ? <div className="who"><span>{user.name}</span><button type="button" className="linkbtn" onClick={onOut}>Sign out</button></div> : null}
+      {user ? <div className="who"><span>{user.name || user.email}</span><a className="linkbtn" href="#/matches">Matches</a><a className="linkbtn" href="#/profile">Profile</a><button type="button" className="linkbtn" onClick={onOut}>Sign out</button></div> : null}
     </div></div>
   );
 }
 
+function Spinner({ big }) { return <span className={"spin" + (big ? " big" : "")} aria-hidden="true"></span>; }
+
 function SignIn({ onDone }) {
+  const [mode, setMode] = useState("signup");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
-  function submit(e) {
+  const [busy, setBusy] = useState(false);
+  const signup = mode === "signup";
+  async function submit(e) {
     e.preventDefault();
-    if (!name.trim()) return setErr("Add your name so we can put it on your replies and cover letters.");
-    if (email.trim() && !/^\S+@\S+\.\S+$/.test(email.trim())) return setErr("That email doesn't look right. Check it, or leave it empty to skip email alerts.");
-    onDone({ name: name.trim(), email: email.trim() });
+    if (signup && !name.trim()) return setErr("Add your name so we can put it on your cover letters.");
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setErr("That email doesn't look right.");
+    if (password.length < 8) return setErr("Use a password with at least 8 characters.");
+    setBusy(true); setErr("");
+    try {
+      const d = signup
+        ? await api("/api/auth/signup", { body: { name: name.trim(), email: email.trim(), password } })
+        : await api("/api/auth/login", { body: { email: email.trim(), password } });
+      onDone(d.user, signup);
+    } catch (x) { setErr(x.message); setBusy(false); }
   }
   return (
     <main className="page">
@@ -289,21 +333,30 @@ function SignIn({ onDone }) {
         <div>
           <h1>Let's find you some work.</h1>
           <p className="sub">Tell us who you are, then build your profile. It takes about five minutes, and you only do it once.</p>
-          <p className="note">no password, no card. Your details stay in this browser.</p>
+          <p className="note">real jobs, checked for scams, with a cover letter ready to send.</p>
         </div>
         <form className="panel" onSubmit={submit} noValidate>
-          <h2>Start here</h2>
+          <h2>{signup ? "Create your account" : "Welcome back"}</h2>
+          {signup ? (
+            <div className="field">
+              <label htmlFor="n">Full name</label>
+              <input id="n" className="in" value={name} onChange={function (e) { setName(e.target.value); setErr(""); }} autoComplete="name" placeholder="Adaeze Okafor" />
+            </div>
+          ) : null}
           <div className="field">
-            <label htmlFor="n">Full name</label>
-            <input id="n" className={"in" + (err && !name.trim() ? " bad" : "")} value={name} onChange={function (e) { setName(e.target.value); setErr(""); }} autoComplete="name" placeholder="Adaeze Okafor" />
-          </div>
-          <div className="field">
-            <label htmlFor="e">Email<small>Optional. Leave it empty to turn email off.</small></label>
+            <label htmlFor="e">Email</label>
             <input id="e" className="in" type="email" value={email} onChange={function (e) { setEmail(e.target.value); setErr(""); }} autoComplete="email" placeholder="you@example.com" />
           </div>
+          <div className="field">
+            <label htmlFor="pw">Password<small>At least 8 characters</small></label>
+            <input id="pw" className="in" type="password" value={password} onChange={function (e) { setPassword(e.target.value); setErr(""); }} autoComplete={signup ? "new-password" : "current-password"} />
+          </div>
           {err ? <p className="err" role="alert">{err}</p> : null}
-          <button type="submit" className="btn pink block" style={{ marginTop: 8 }}>Continue</button>
-          <p className="small">Signing in here only saves your profile in this browser. WorkDey runs on Apify, so your account there handles the actual runs.</p>
+          <button type="submit" className="btn pink block" style={{ marginTop: 8 }} disabled={busy}>{busy ? <Spinner /> : null}{signup ? "Create account" : "Sign in"}</button>
+          <p className="small">
+            {signup ? "Already have an account? " : "New here? "}
+            <button type="button" className="linkbtn dark" onClick={function () { setMode(signup ? "login" : "signup"); setErr(""); }}>{signup ? "Sign in" : "Create an account"}</button>
+          </p>
         </form>
       </div>
     </main>
@@ -339,62 +392,77 @@ function TagInput({ value, onChange, placeholder, max, pink, label }) {
   );
 }
 
-const EMPTY = {
-  fullName: "", email: "", education: "", experienceYears: "", skills: [], targetRoles: [], locations: ["Lagos"],
-  customLocations: [], workType: "either", cvText: "", sources: ["myjobmag", "jobberman", "remote-rss"],
-  minScore: 60, maxPacks: 3, schedule: "5",
-};
-
-function toInput(p) {
+function fromState(s) {
+  const pr = (s && s.profile) || {}, w = (s && s.watch) || {};
   return {
-    fullName: p.fullName.trim(),
-    email: p.email.trim() || undefined,
-    skills: p.skills,
-    targetRoles: p.targetRoles,
-    education: p.education.trim() || undefined,
-    experienceYears: p.experienceYears === "" ? undefined : Number(p.experienceYears),
-    locations: p.locations.concat(p.customLocations),
-    workType: p.workType === "full-time" || p.workType === "gig" ? p.workType : "either",
-    cvText: p.cvText.trim() || undefined,
-    sources: p.sources,
-    minScore: p.minScore,
-    maxPacks: p.maxPacks,
+    name: (s && s.user && s.user.name) || "",
+    skills: pr.skills_tags || [],
+    roles: pr.target_roles || [],
+    locations: pr.locations || [],
+    years: pr.years_experience == null ? "" : String(pr.years_experience),
+    paidOnly: !!pr.paid_only,
+    enabled: !!w.enabled,
+    cadence: w.cadence_hours || 24,
+    emailOn: w.email_on !== false,
+    threshold: Math.round((w.match_threshold || 0.5) * 100),
   };
 }
 
-function Profile({ user }) {
-  const [p, setP] = useState(function () {
-    const saved = load("workdey.profile", null);
-    return Object.assign({}, EMPTY, { fullName: user.name, email: user.email }, saved || {});
-  });
+let autoRun = false; /* set by the profile page so "Find jobs" starts a run on arrival */
+
+function Profile({ state, onState }) {
+  const [p, setP] = useState(function () { return fromState(state); });
   const [errs, setErrs] = useState({});
   const [toast, setToast] = useState("");
+  const [busy, setBusy] = useState("");
+  const fileRef = useRef(null);
+  const pr = (state && state.profile) || {};
   function set(k, v) { setP(function (o) { const n = Object.assign({}, o); n[k] = v; return n; }); }
-  function say(m) { setToast(m); setTimeout(function () { setToast(""); }, 2600); }
-  function toggle(k, v) { set(k, p[k].indexOf(v) >= 0 ? p[k].filter(function (x) { return x !== v; }) : p[k].concat(v)); }
-
-  const packs = p.maxPacks;
-  const est = PRICE_START + TYPICAL_MATCHES * (PRICE_VERIFIED + PRICE_RESULT) + packs * PRICE_PACK;
+  function say(m) { setToast(m); setTimeout(function () { setToast(""); }, 3200); }
+  function toggleLoc(l) { set("locations", p.locations.indexOf(l) >= 0 ? p.locations.filter(function (x) { return x !== l; }) : p.locations.concat(l)); }
 
   function validate() {
     const e = {};
-    if (!p.fullName.trim()) e.fullName = "We need your name for the reply and cover letter.";
-    if (p.email.trim() && !/^\S+@\S+\.\S+$/.test(p.email.trim())) e.email = "That email doesn't look right.";
-    if (!p.skills.length) e.skills = "Add at least one skill. It's the main thing we match on.";
-    if (!p.targetRoles.length) e.targetRoles = "Add at least one role you want.";
-    if (!p.sources.length) e.sources = "Pick at least one place to look.";
+    if (!p.roles.length) e.roles = "Add at least one role you want.";
+    if (!p.skills.length && !pr.cv_text) e.skills = "Add a few skills or upload your CV. It's the main thing we match on.";
     setErrs(e);
     return Object.keys(e).length === 0;
   }
-  function start() {
-    if (!validate()) { say("A few things need filling in first."); return; }
-    save("workdey.profile", p);
-    go("#/run");
+  async function persist() {
+    const years = p.years === "" ? undefined : parseInt(p.years, 10);
+    const body = { name: p.name.trim() || undefined, skills_tags: p.skills, target_roles: p.roles, locations: p.locations, paid_only: p.paidOnly };
+    if (years !== undefined && !isNaN(years)) body.years_experience = years;
+    await api("/api/profile", { body });
+    await api("/api/watch", { body: { enabled: p.enabled, cadence_hours: p.cadence, email_on: p.emailOn, match_threshold: Math.min(0.85, Math.max(0.2, p.threshold / 100)) } });
+    onState();
   }
-  function saveTask() {
+  async function save(then) {
     if (!validate()) { say("A few things need filling in first."); return; }
-    say(save("workdey.profile", p) ? "Saved in this browser." : "Couldn't save. Your browser is blocking storage.");
+    setBusy("save");
+    try { await persist(); if (then) then(); else say("Saved."); }
+    catch (x) { say(x.message); }
+    setBusy("");
   }
+  function find() { save(function () { autoRun = true; go("#/matches"); }); }
+
+  async function upload(e) {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    if (!/\.(pdf|docx)$/i.test(f.name)) { say("Please choose a PDF or DOCX file."); return; }
+    setBusy("cv");
+    try {
+      const form = new FormData(); form.append("file", f);
+      const d = await api("/api/profile/cv", { form, timeout: 90000 });
+      const x = d.extracted || {};
+      if (x.skills_tags && x.skills_tags.length) set("skills", Array.from(new Set(p.skills.concat(x.skills_tags))));
+      if (x.years_experience != null && p.years === "") set("years", String(x.years_experience));
+      onState();
+      say("CV read. Check the skills we picked up.");
+    } catch (x) { say(x.message); }
+    setBusy("");
+  }
+
   return (
     <main className="page">
       <h1>Your profile</h1>
@@ -405,21 +473,11 @@ function Profile({ user }) {
             <div className="two">
               <div className="field">
                 <label htmlFor="fn">Full name</label>
-                <input id="fn" className={"in" + (errs.fullName ? " bad" : "")} value={p.fullName} onChange={function (e) { set("fullName", e.target.value); }} autoComplete="name" />
-                {errs.fullName ? <p className="err">{errs.fullName}</p> : null}
-              </div>
-              <div className="field">
-                <label htmlFor="em">Email<small>Optional</small></label>
-                <input id="em" className={"in" + (errs.email ? " bad" : "")} type="email" value={p.email} onChange={function (e) { set("email", e.target.value); }} autoComplete="email" />
-                {errs.email ? <p className="err">{errs.email}</p> : null}
-              </div>
-              <div className="field">
-                <label htmlFor="ed">Education</label>
-                <input id="ed" className="in" value={p.education} onChange={function (e) { set("education", e.target.value); }} placeholder="BSc Statistics, UNILAG, NYSC 2025" />
+                <input id="fn" className="in" value={p.name} onChange={function (e) { set("name", e.target.value); }} autoComplete="name" />
               </div>
               <div className="field">
                 <label htmlFor="ex">Experience (years)</label>
-                <input id="ex" className="in" type="number" min="0" max="40" value={p.experienceYears} onChange={function (e) { set("experienceYears", e.target.value); }} placeholder="1" />
+                <input id="ex" className="in" type="number" min="0" max="40" value={p.years} onChange={function (e) { set("years", e.target.value); }} placeholder="1" />
               </div>
             </div>
           </div>
@@ -431,18 +489,15 @@ function Profile({ user }) {
               {errs.skills ? <p className="err">{errs.skills}</p> : null}
             </div>
             <div className="field">
-              <span className="lab">Target roles<small>Up to 3</small></span>
-              <TagInput pink max={3} value={p.targetRoles} onChange={function (v) { set("targetRoles", v); }} placeholder="Add role" label="Target roles" />
-              {errs.targetRoles ? <p className="err">{errs.targetRoles}</p> : null}
+              <span className="lab">Target roles</span>
+              <TagInput pink value={p.roles} onChange={function (v) { set("roles", v); }} placeholder="Add role" label="Target roles" />
+              {errs.roles ? <p className="err">{errs.roles}</p> : null}
             </div>
             <div className="field">
               <span className="lab">Where can you work?</span>
               <div className="pills">
-                {LOCATIONS.map(function (l) {
-                  return <button type="button" key={l} className="pill" aria-pressed={p.locations.indexOf(l) >= 0} onClick={function () { toggle("locations", l); }}>{l}</button>;
-                })}
-                {p.customLocations.map(function (l) {
-                  return <button type="button" key={l} className="pill" aria-pressed="true" title="Remove" onClick={function () { set("customLocations", p.customLocations.filter(function (x) { return x !== l; })); }}>{l} &times;</button>;
+                {LOCATIONS.concat(p.locations.filter(function (l) { return LOCATIONS.indexOf(l) < 0; })).map(function (l) {
+                  return <button type="button" key={l} className="pill" aria-pressed={p.locations.indexOf(l) >= 0} onClick={function () { toggleLoc(l); }}>{l}</button>;
                 })}
               </div>
               <div style={{ marginTop: 8 }}>
@@ -451,76 +506,54 @@ function Profile({ user }) {
                     if (e.key !== "Enter") return;
                     e.preventDefault();
                     const t = e.target.value.trim();
-                    if (t && LOCATIONS.concat(p.customLocations).indexOf(t) < 0) set("customLocations", p.customLocations.concat(t));
+                    if (t && p.locations.indexOf(t) < 0) set("locations", p.locations.concat(t));
                     e.target.value = "";
                   }} />
               </div>
             </div>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <span className="lab" id="wt">Work type</span>
-              <div className="seg" role="radiogroup" aria-labelledby="wt">
-                {[["full-time", "Full-time"], ["gig", "Gig"], ["either", "Either"]].map(function (o) {
-                  return <button type="button" key={o[0]} role="radio" aria-checked={p.workType === o[0]} onClick={function () { set("workType", o[0]); }}>{o[1]}</button>;
-                })}
-              </div>
-            </div>
+            <label className="check" style={{ paddingBottom: 0 }}>
+              <input type="checkbox" checked={p.paidOnly} onChange={function () { set("paidOnly", !p.paidOnly); }} />
+              <span className="box" aria-hidden="true"></span>Paid roles only
+            </label>
           </div>
 
           <div className="card">
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label htmlFor="cv">CV text<small>Plain text. We only use facts from here.</small></label>
-              <textarea id="cv" className="in" value={p.cvText} onChange={function (e) { set("cvText", e.target.value); }}
-                placeholder={"Paste your CV here.\n\nInclude your jobs, dates, what you built or achieved, and your skills."} />
-            </div>
+            <span className="lab">Your CV<small>PDF or DOCX. We read it and suggest skills.</small></span>
+            <p className="small" style={{ marginTop: 6 }}>{pr.cv_text ? "A CV is on file. Upload again to replace it." : "No CV uploaded yet."}{pr.completeness != null ? " Profile " + pr.completeness + "% complete." : ""}</p>
+            <input ref={fileRef} type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={upload} hidden />
+            <button type="button" className="btn" style={{ marginTop: 12 }} disabled={busy === "cv"} onClick={function () { fileRef.current && fileRef.current.click(); }}>{busy === "cv" ? <Spinner /> : null}{busy === "cv" ? "Reading your CV..." : (pr.cv_text ? "Replace CV" : "Upload CV")}</button>
           </div>
         </div>
 
         <aside className="stack aside">
           <div className="card">
-            <span className="lab">Where should we look?</span>
-            {SOURCES.map(function (s) {
-              return (
-                <label className="check" key={s.id}>
-                  <input type="checkbox" checked={p.sources.indexOf(s.id) >= 0} onChange={function () { toggle("sources", s.id); }} />
-                  <span className="box" aria-hidden="true"></span>{s.label}
-                </label>
-              );
-            })}
-            {errs.sources ? <p className="err">{errs.sources}</p> : null}
-            <div className="sep">
-              <div className="row"><label htmlFor="ms" className="lab" style={{ margin: 0 }}>Minimum fit score</label><span className="val">{p.minScore}</span></div>
-              <input id="ms" type="range" min="0" max="100" value={p.minScore} onChange={function (e) { set("minScore", Number(e.target.value)); }} />
-            </div>
-            <div className="row sep">
-              <span className="lab" id="pk">Packs per run</span>
-              <div className="stepper" role="group" aria-labelledby="pk">
-                <button type="button" aria-label="Fewer packs" onClick={function () { set("maxPacks", Math.max(1, packs - 1)); }}>&minus;</button>
-                <b>{packs}</b>
-                <button type="button" aria-label="More packs" onClick={function () { set("maxPacks", Math.min(5, packs + 1)); }}>+</button>
-              </div>
-            </div>
+            <label className="check" style={{ paddingTop: 0 }}>
+              <input type="checkbox" checked={p.enabled} onChange={function () { set("enabled", !p.enabled); }} />
+              <span className="box" aria-hidden="true"></span>Auto-pilot
+            </label>
+            <p className="small" style={{ margin: "0 0 4px" }}>WorkDey keeps looking in the background and adds new matches for you.</p>
             <div className="sep">
               <span className="lab" id="sc">How often?</span>
-              <div className="seg" role="radiogroup" aria-labelledby="sc" style={{ marginTop: 8 }}>
-                {SCHEDULES.map(function (s) {
-                  return <button type="button" key={s.id} role="radio" aria-checked={p.schedule === s.id} onClick={function () { set("schedule", s.id); }}>{s.short}</button>;
+              <div className="pills" role="radiogroup" aria-labelledby="sc" style={{ marginTop: 8 }}>
+                {CADENCES.map(function (c) {
+                  return <button type="button" key={c.h} role="radio" className="pill" aria-checked={p.cadence === c.h} aria-pressed={p.cadence === c.h} onClick={function () { set("cadence", c.h); }}>{c.label}</button>;
                 })}
               </div>
             </div>
-          </div>
-
-          <div className="cost" aria-label="Estimated cost per run">
-            <div className="r"><span>{TYPICAL_MATCHES} x verified match</span><span>{money(TYPICAL_MATCHES * PRICE_VERIFIED)}</span></div>
-            <div className="r"><span>{TYPICAL_MATCHES} x result</span><span>{money(TYPICAL_MATCHES * PRICE_RESULT)}</span></div>
-            <div className="r"><span>{packs} x application pack</span><span>{money(packs * PRICE_PACK)}</span></div>
-            <hr />
-            <div className="tot"><span>Est. per run</span><b>{money(est)}</b></div>
-            <p className="why">Based on {TYPICAL_MATCHES} matches a run. Each pack is $0.50, so fewer packs costs less.</p>
+            <div className="sep">
+              <div className="row"><label htmlFor="ms" className="lab" style={{ margin: 0 }}>Match strictness</label><span className="val">{p.threshold}</span></div>
+              <input id="ms" type="range" min="20" max="85" value={p.threshold} onChange={function (e) { set("threshold", Number(e.target.value)); }} />
+              <p className="small" style={{ marginTop: 6 }}>Higher means fewer, closer matches.</p>
+            </div>
+            <label className="check sep">
+              <input type="checkbox" checked={p.emailOn} onChange={function () { set("emailOn", !p.emailOn); }} />
+              <span className="box" aria-hidden="true"></span>Email me new matches
+            </label>
           </div>
 
           <div className="actions">
-            <button type="button" className="btn pink block" onClick={start}>Start</button>
-            <button type="button" className="btn block" onClick={saveTask}>Save as task</button>
+            <button type="button" className="btn pink block" disabled={!!busy} onClick={find}>{busy === "save" ? <Spinner /> : null}Save and find jobs</button>
+            <button type="button" className="btn block" disabled={!!busy} onClick={function () { save(); }}>Save</button>
           </div>
         </aside>
       </div>
@@ -530,49 +563,10 @@ function Profile({ user }) {
   );
 }
 
-const SOURCE_LABEL = { "myjobmag": "MyJobMag", "jobberman": "Jobberman", "remote-rss": "Remote jobs (RSS)" };
-
 function listJoin(a) { return a.length <= 1 ? (a[0] || "") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1]; }
-
-/* Sample jobs shaped by the profile. A real run happens on Apify; this shows what she will get. */
-function demoMatches(p) {
-  const roles = p.targetRoles.length ? p.targetRoles : ["Data Analyst"];
-  const skills = p.skills.slice(0, 4);
-  const src = p.sources.length ? p.sources : ["myjobmag"];
-  const S = function (i) { return SOURCE_LABEL[src[i % src.length]]; };
-  const loc = p.locations.concat(p.customLocations)[0] || "Lagos";
-  const first = p.fullName.trim().split(" ")[0] || "";
-  const skillLine = skills.length ? listJoin(skills.slice(0, 3)) + " match your CV" : "Matches your profile";
-  const exp = p.experienceYears === "" ? "" : p.experienceYears + (Number(p.experienceYears) === 1 ? " year" : " years");
-  const base = [
-    { title: "Junior " + roles[0], company: "Kora Logistics", location: "Yaba, " + loc, source: S(0), postedAt: "9h ago", fitScore: 86, workType: "Full-time", reasons: [skillLine, "Entry level role in " + loc] },
-    { title: roles[1] || "Reporting Analyst", company: "Tanta Health", location: "Remote, Nigeria", source: S(1), postedAt: "1d ago", fitScore: 78, workType: "Full-time", reasons: [skills[1] ? skills[1] + " is asked for in the post" : "Close to the role you want", "Open to remote applicants"] },
-    { title: "Spreadsheet cleanup", company: "Independent poster", location: "Remote", source: S(2), postedAt: "5h ago", fitScore: 71, workType: "Gig", reasons: ["Short task that fits your skills", "Quick to start"] },
-    { title: "Data Officer", company: "Brightline MFB", location: loc, source: S(0), postedAt: "2d ago", fitScore: 64, reasons: [] },
-    { title: "M&E Assistant", company: "Hopeline Foundation", location: "Abuja", source: S(1), postedAt: "2d ago", fitScore: 61, reasons: [] },
-  ];
-  return base.filter(function (m) { return m.fitScore >= p.minScore; }).map(function (m, i) {
-    const m2 = Object.assign({ scamRisk: "low", url: "#" }, m);
-    if (i < p.maxPacks) {
-      m2.coverLetter = "Dear Hiring Team at " + m.company + ",\n\nI am applying for the " + m.title + " role." +
-        (p.education.trim() ? " " + p.education.trim() + "." : "") +
-        (skills.length ? "\n\nMy skills include " + listJoin(skills) + (exp ? ", and I have " + exp + " of hands-on experience." : ".") : "") +
-        "\n\nI would welcome the chance to discuss how I can support your team. Thank you for your time.\n\nYours sincerely,\n" + p.fullName.trim();
-      m2.reply = "Hello, I saw your post for " + m.title + " at " + m.company + "." + (skills.length ? " I work with " + listJoin(skills.slice(0, 3)) + "." : "") + " Could we speak this week?\n\n" + first;
-      m2.cvTips = [
-        (skills[0] || "Your strongest skill") + " is in the post. Put it first in your skills list.",
-        "Add one measurable result to your most recent role.",
-        "Change your CV headline to “" + m.title + "”.",
-        "Rewritten summary: " + (p.education.trim() || "Graduate") + (exp ? " with " + exp + " of hands-on experience" : "") + (skills.length ? " in " + listJoin(skills.slice(0, 3)) : "") + ", looking for a " + m.title + " role.",
-      ];
-    }
-    return m2;
-  });
-}
-
 function wordsOf(t) { const s = String(t || "").trim(); return s ? s.split(/\s+/).length : 0; }
-function textOf(v) { return Array.isArray(v) ? v.map(function (x) { return "- " + x; }).join("\n") : String(v == null ? "" : v); }
-function hasPack(m) { return !!(m.reply || m.coverLetter || m.cvTips); }
+function pct(m) { return Math.max(0, Math.min(100, Math.round((Number(m.fit_score) || 0) * 100))); }
+function host(u) { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return ""; } }
 
 function Ico({ name }) {
   const p = { width: 16, height: 16, viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" };
@@ -593,15 +587,15 @@ function useWide() {
   return w;
 }
 
-function CopyBtn({ text, label, plain }) {
+function CopyBtn({ text, label }) {
   const [done, setDone] = useState(false);
   function copy() {
     if (!navigator.clipboard) return;
     navigator.clipboard.writeText(text).then(function () { setDone(true); setTimeout(function () { setDone(false); }, 1800); }, function () {});
   }
   return (
-    <button type="button" className={"btn " + (plain ? "" : "copy") + (done ? " done" : "")} onClick={copy} aria-label={"Copy " + label}>
-      {plain ? null : <Ico name={done ? "check" : "copy"} />}{done ? "Copied" : (plain ? "Copy settings" : "Copy")}
+    <button type="button" className={"btn copy" + (done ? " done" : "")} onClick={copy} disabled={!text} aria-label={"Copy " + label}>
+      <Ico name={done ? "check" : "copy"} />{done ? "Copied" : "Copy"}
     </button>
   );
 }
@@ -621,234 +615,277 @@ function Ring({ score }) {
 }
 
 const TABS = [
-  { key: "coverLetter", label: "Cover letter", short: "Letter", max: 280 },
-  { key: "reply", label: "Reply", short: "Reply", max: 90 },
-  { key: "cvTips", label: "CV tips", short: "CV tips", max: 0 },
+  { kind: "cover", label: "Cover letter", short: "Letter", button: "Write my cover letter" },
+  { kind: "reply", label: "Reply", short: "Reply", button: "Write a short reply" },
+  { kind: "cv", label: "Tailored CV", short: "CV", button: "Tailor my CV" },
 ];
 
-function Reasons({ list }) {
-  return <ul className="reasons">{(list || []).map(function (r, i) { return <li key={i}><Ico name="check" /><span>{r}</span></li>; })}</ul>;
+/* Reveals fresh text a few characters at a time. Skipped for people who prefer less motion. */
+function Typed({ text, fresh }) {
+  const [n, setN] = useState(fresh && !reducedMotion() ? 0 : text.length);
+  useEffect(function () {
+    if (n >= text.length) return;
+    const id = setTimeout(function () { setN(Math.min(text.length, n + 6)); }, 12);
+    return function () { clearTimeout(id); };
+  }, [n, text]);
+  return <p>{text.slice(0, n)}</p>;
 }
 
-function Detail({ m, wide }) {
-  const [tab, setTab] = useState("coverLetter");
-  const t = TABS.find(function (x) { return x.key === tab; });
-  const value = m[tab];
-  const text = textOf(value);
-  const n = wordsOf(text);
-  const risk = m.scamRisk ? String(m.scamRisk).toLowerCase() : "";
+function Detail({ m, wide, drafts, onDraft, onStatus, onOpen }) {
+  const [tab, setTab] = useState("cover");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [fresh, setFresh] = useState("");
+  const t = TABS.find(function (x) { return x.kind === tab; });
+  const opp = m.opportunity || {};
+  const draft = drafts[tab];
+  const text = draft ? draft.body : "";
+
+  async function generate() {
+    setBusy(true); setErr("");
+    try {
+      const d = await api("/api/matches/" + m.id + "/generate", { body: { kind: tab, note: note.trim() || undefined }, timeout: 90000 });
+      onDraft(tab, d.draft);
+      setFresh(d.draft.id);
+    } catch (x) { setErr(x.message); }
+    setBusy(false);
+  }
+
   const tabs = (
     <div className={"tabseg" + (wide ? "" : " full")} role="tablist" aria-label="Drafts for this job">
       {TABS.map(function (x) {
-        return <button key={x.key} type="button" role="tab" aria-selected={tab === x.key} onClick={function () { setTab(x.key); }}>{wide ? x.label : x.short}</button>;
+        return <button key={x.kind} type="button" role="tab" aria-selected={tab === x.kind} onClick={function () { setTab(x.kind); setErr(""); }}>{wide ? x.label : x.short}</button>;
       })}
     </div>
   );
-  const acts = (
-    <div className="acts2">
-      {wide
-        ? <><a className="btn" href={m.url} target="_blank" rel="noopener noreferrer">View post</a><CopyBtn text={text} label={t.label} /></>
-        : <><CopyBtn text={text} label={t.label} /><a className="btn" href={m.url} target="_blank" rel="noopener noreferrer">View post</a></>}
+  const link = opp.url ? <a className="btn" href={opp.url} target="_blank" rel="noopener noreferrer" onClick={onOpen}>View post</a> : null;
+  const acts = <div className="acts2">{link}<CopyBtn text={text} label={t.label} /></div>;
+  const body = (
+    <div className="rbody-in">
+      <div className="body-top"><h4>{t.label}</h4>{text ? <span className="words">{wordsOf(text) + " words"}</span> : null}</div>
+      {text ? (
+        <div className="text-box" role="tabpanel"><Typed key={draft.id} text={text} fresh={fresh === draft.id} /></div>
+      ) : (
+        <div className="text-box empty" role="tabpanel">
+          <p>Nothing written yet. WorkDey drafts this from your CV and this job post.</p>
+        </div>
+      )}
+      <div className="field" style={{ marginTop: 14, marginBottom: 10 }}>
+        <label htmlFor={"nt" + m.id}>Anything to emphasise?<small>Optional</small></label>
+        <input id={"nt" + m.id} className="in" value={note} onChange={function (e) { setNote(e.target.value); }} placeholder="e.g. Lead with my SQL projects" maxLength={300} />
+      </div>
+      <button type="button" className="btn pink" onClick={generate} disabled={busy}>{busy ? <Spinner /> : null}{busy ? "Writing..." : (text ? "Write it again" : t.button)}</button>
+      {err ? <p className="err" role="alert" style={{ marginTop: 10 }}>{err}</p> : null}
+      {text ? <div className="draft"><Ico name="alert" /><span><b>Draft.</b> Review before sending.</span></div> : null}
     </div>
   );
-  const box = (
-    <div className="text-box" role="tabpanel">
-      {Array.isArray(value) ? <ul>{value.map(function (v, i) { return <li key={i}>{v}</li>; })}</ul> : <p>{text}</p>}
+  const status = (
+    <div className="statusrow">
+      <button type="button" className={"btn sm" + (m.status === "applied" ? " done" : "")} onClick={function () { onStatus(m, "applied"); }}>{m.status === "applied" ? "Applied" : "Mark applied"}</button>
+      <button type="button" className="btn sm" onClick={function () { onStatus(m, "dismissed"); }}>Not for me</button>
+      <button type="button" className="btn sm" onClick={function () { onStatus(m, "spam"); }}>Looks like a scam</button>
     </div>
   );
-  const draft = <div className="draft"><Ico name="alert" /><span><b>Draft.</b> Review before sending.</span></div>;
-  const top = <div className="body-top"><h4>{t.label}</h4>{t.max ? <span className="words">{n + " / " + t.max + " words"}</span> : null}</div>;
+
   if (wide) {
     return (
-      <section className="detail" aria-label={m.title}>
+      <section className="detail" aria-label={opp.title}>
         <div className="detail-head">
           <div>
             <div className="chips">
-              <span className="chip">{m.source}</span><span className="chip">{m.location}</span>
-              {m.workType ? <span className="chip">{m.workType}</span> : null}
-              {risk ? <span className={"chip " + risk}>{"Scam risk " + risk}</span> : null}
+              {host(opp.url) ? <span className="chip">{host(opp.url)}</span> : null}
+              {opp.location ? <span className="chip">{opp.location}</span> : null}
+              {m.status === "applied" ? <span className="chip low">Applied</span> : null}
             </div>
-            <h3>{m.title}</h3>
-            <p className="by">{m.company + " · " + m.postedAt}</p>
-            <Reasons list={m.reasons} />
+            <h3>{opp.title}</h3>
+            <p className="by">{opp.company || "Company not stated"}</p>
+            {opp.body ? <p className="snippet">{String(opp.body).slice(0, 320)}{String(opp.body).length > 320 ? "..." : ""}</p> : null}
           </div>
-          <Ring score={m.fitScore} />
+          <Ring score={pct(m)} />
         </div>
         <div className="toolbar">{tabs}{acts}</div>
-        <div className="rbody">{top}{box}{draft}</div>
+        <div className="rbody">{body}{status}</div>
       </section>
     );
   }
   return (
     <div className="expand narrow">
-      <Reasons list={m.reasons} />
+      {opp.body ? <p className="snippet">{String(opp.body).slice(0, 260)}{String(opp.body).length > 260 ? "..." : ""}</p> : null}
       {tabs}
-      <div style={{ marginTop: 16 }}>{top}</div>
-      {box}
-      {draft}
+      <div style={{ marginTop: 16 }}>{body}</div>
       {acts}
+      {status}
     </div>
   );
 }
 
-function Run({ user }) {
+function Matches({ user }) {
   const wide = useWide();
-  const [p] = useState(function () { return Object.assign({}, EMPTY, { fullName: user.name, email: user.email }, load("workdey.profile", {})); });
-  const [all] = useState(function () { return demoMatches(p); });
-  const packs = all.filter(hasPack);
-  const others = all.filter(function (m) { return !hasPack(m); });
-  const email = p.email.trim();
-  const srcNames = p.sources.map(function (s) { return SOURCE_LABEL[s] || s; });
-  const steps = [
-    { t: "Reading job sources", d: srcNames.length ? listJoin(srcNames) : "No sources picked" },
-    { t: "Dropping repeats, scams and non-jobs", d: "214 posts read, 142 look real" },
-    { t: "Scoring each job against your profile", d: all.length + (all.length === 1 ? " job scores " : " jobs score ") + p.minScore + " or higher" },
-    { t: "Writing your application packs", d: packs.length + (packs.length === 1 ? " pack" : " packs") + ": reply, cover letter and CV tips" },
-    { t: email ? "Emailing you" : "Email is off", d: email ? "Sent to " + email : "Add an email in your profile to get alerts" },
-  ];
-  const reduce = (function () { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } })();
-  const [n, setN] = useState(reduce ? steps.length : 0);
-  const [sel, setSel] = useState(0);
+  const [list, setList] = useState(null);
+  const [drafts, setDrafts] = useState({});
+  const [sel, setSel] = useState(null);
+  const [running, setRunning] = useState(false);
+  const [note, setNote] = useState("");
+  const [err, setErr] = useState("");
+  const [tick, setTick] = useState(0);
+
+  async function load() {
+    try {
+      const d = await api("/api/matches");
+      const rows = (d.matches || []).filter(function (x) { return x.status !== "dismissed" && x.status !== "spam"; });
+      rows.sort(function (a, b) { return (b.fit_score || 0) - (a.fit_score || 0); });
+      setList(rows);
+      setSel(function (s) { return s && rows.some(function (r) { return r.id === s; }) ? s : (rows[0] ? rows[0].id : null); });
+      return rows;
+    } catch (x) { setErr(x.message); setList([]); return []; }
+  }
+  async function run() {
+    setRunning(true); setErr(""); setNote(""); setTick(0);
+    try {
+      const d = await api("/api/watch/run", { method: "POST", body: {}, timeout: 170000 });
+      const n = d.matches || 0;
+      setNote(n ? n + (n === 1 ? " match found" : " matches found") + (d.mailed ? ", " + d.mailed + " emailed to you." : ".") : "No new matches this time. Try lowering the match strictness, or add skills.");
+      await load();
+    } catch (x) { setErr(x.message); }
+    setRunning(false);
+  }
   useEffect(function () {
-    if (n >= steps.length) return;
-    const id = setTimeout(function () { setN(n + 1); }, 850);
-    return function () { clearTimeout(id); };
-  }, [n]);
-  const done = n >= steps.length;
-  const cur = packs[Math.min(sel, packs.length - 1)];
-  const json = JSON.stringify(toInput(p), null, 2);
-  const top = all[0];
+    load().then(function () { if (autoRun) { autoRun = false; run(); } });
+  }, []);
+  useEffect(function () {
+    if (!running) return;
+    const id = setInterval(function () { setTick(function (t) { return t + 1; }); }, 1000);
+    return function () { clearInterval(id); };
+  }, [running]);
+
+  async function setStatus(m, status) {
+    try {
+      await api("/api/matches/" + m.id + "/status", { body: { status } });
+      if (status === "applied") setList(function (l) { return l.map(function (x) { return x.id === m.id ? Object.assign({}, x, { status }) : x; }); });
+      else await load();
+    } catch (x) { setErr(x.message); }
+  }
+  function opened(m) { if (m.status === "new") api("/api/matches/" + m.id + "/status", { body: { status: "viewed" } }).catch(function () {}); }
+
+  /* Opening a match asks the server for its full record, which also marks it viewed. */
+  async function choose(id) {
+    setSel(id);
+    if (drafts[id] && drafts[id].loaded) return;
+    try {
+      const d = await api("/api/matches/" + id);
+      const found = d.match || {};
+      const ds = {};
+      (found.drafts || []).forEach(function (x) { ds[x.kind] = x; });
+      setDrafts(function (o) { return Object.assign({}, o, { [id]: Object.assign({ loaded: true }, ds, o[id] || {}) }); });
+    } catch (x) { /* the list already has what we need to show */ }
+  }
+  useEffect(function () { if (sel && list && list.length) choose(sel); }, [sel, list && list.length]);
+
+  const cur = list && list.find(function (m) { return m.id === sel; });
+  const steps = ["Searching job sites and company pages", "Removing repeats and scams", "Scoring each job against your profile", "Sending you the best ones"];
+  const stepNow = Math.min(steps.length - 1, Math.floor(tick / 18));
 
   return (
     <main className="page">
       <div className="runhead">
         <div>
-          <h1>{done ? "Your matches" : "Looking for you"}</h1>
-          <p className="sub">{p.targetRoles.join(", ") || "Your roles"} in {p.locations.concat(p.customLocations).join(", ") || "anywhere"}. Minimum score {p.minScore}.</p>
+          <h1>{running ? "Looking for you" : "Your matches"}</h1>
+          <p className="sub">Hi {(user.name || "").split(" ")[0] || "there"}. {running ? "This takes up to two minutes. You can leave this page open." : "New jobs, scored against your profile, with a cover letter ready to write."}</p>
         </div>
         <div className="acts">
           <button type="button" className="btn" onClick={function () { go("#/profile"); }}>Edit profile</button>
-          <button type="button" className="btn" onClick={function () { setN(0); setSel(0); }}>Run again</button>
+          <button type="button" className="btn pink" onClick={run} disabled={running}>{running ? <Spinner /> : null}{running ? "Running..." : "Run agent now"}</button>
         </div>
       </div>
 
-      <ol className="steps" aria-live="polite">
-        {steps.map(function (s, i) {
-          const state = i < n ? "done" : i === n ? "now" : "wait";
-          return (
-            <li key={i} className={state}>
-              <span className="st-dot">{state === "done" ? <Ico name="check" /> : null}</span>
-              <div><b>{s.t}</b>{state === "done" ? <span>{s.d}</span> : null}</div>
-            </li>
-          );
-        })}
-      </ol>
-
-      {done ? (
-        <>
-          <div className="rtop">
-            <h2>{all.length === 0 ? "No matches this run" : (packs.length || all.length) + ((packs.length || all.length) === 1 ? " match" : " matches")}</h2>
-            <div className="stats">
-              <div className="stat"><b>214</b><span>Scanned</span></div>
-              <div className="stat"><b>142</b><span>Verified</span></div>
-              <div className="stat"><b>{all.length}</b><span>Matches</span></div>
-              <div className="stat pinkc"><b>{packs.length}</b><span>Packs</span></div>
-            </div>
-          </div>
-
-          {all.length === 0 ? (
-            <div className="panel"><h2>Nothing scored {p.minScore} or higher</h2><p className="sub">Try lowering the minimum fit score in your profile, or add more skills.</p></div>
-          ) : (
-            <div className="rlayout">
-              <div className="side">
-                {packs.map(function (m, i) {
-                  const on = cur === m;
-                  return (
-                    <div key={i} className={"item" + (on ? " sel" : "")}>
-                      <button type="button" className="item-head" aria-pressed={on} onClick={function () { setSel(i); }}>
-                        <span className="item-text">
-                          <span className="kicker">{m.source + " · " + m.postedAt}</span>
-                          <span className="item-title">{m.title}</span>
-                          <span className="item-sub">{m.company + " · " + m.location}</span>
-                        </span>
-                        <span className="score-block"><b>{m.fitScore}</b><span>FIT</span></span>
-                      </button>
-                      {on && !wide ? <Detail key={i} m={m} wide={false} /> : null}
-                    </div>
-                  );
-                })}
-                {others.length ? <div className="others-label">Other matches</div> : null}
-                {others.map(function (m, i) {
-                  return (
-                    <div className="other" key={i}>
-                      <span className="other-score">{m.fitScore}</span>
-                      <span className="other-main"><b>{m.title}</b><span>{m.company + " · " + m.location}</span></span>
-                      <a href={m.url}>View post</a>
-                    </div>
-                  );
-                })}
-              </div>
-              {wide && cur ? <Detail key={packs.indexOf(cur)} m={cur} wide={true} /> : null}
-            </div>
-          )}
-
-          <section className="mail" aria-labelledby="mail-h">
-            <div>
-              <h3 id="mail-h">{email ? "We emailed you" : "Email alerts are off"}</h3>
-              {email
-                ? <p>You get a short email like this after every run, with a button that opens these matches. That is all you need to check.</p>
-                : <p className="off">Add your email in your profile and we will send you a short alert after every run, instead of you checking this page.</p>}
-            </div>
-            {all.length && email ? (
-              <div>
-                <p className="hdrs"><b>To</b> {email}<br /><b>Subject</b> {all.length} new job {all.length === 1 ? "match" : "matches"} for you</p>
-                <div className="email">
-                  <div className="stripes"></div>
-                  <div className="in">
-                    <div className="lg"><span className="mark" style={{ border: "1.5px solid #0d0f12", width: 26, height: 26 }}><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#0d0f12" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4l2.5 8L8 6l3.5 6L14 4" /></svg></span>WorkDey</div>
-                    <h5>{all.length} new {all.length === 1 ? "match" : "matches"}</h5>
-                    <p><b>{top.title}</b>, {top.company}. Score {top.fitScore}.</p>
-                    <p>{top.reasons[0]}. Packs drafted for {packs.length === all.length ? (all.length === 1 ? "it" : "all " + all.length) : packs.length + " of " + all.length}.</p>
-                    <span className="pillbtn">View matches</span>
-                  </div>
-                  <div className="foot">{money(packs.length * PRICE_PACK + all.length * (PRICE_VERIFIED + PRICE_RESULT) + PRICE_START)} for this run</div>
-                </div>
-              </div>
-            ) : null}
-          </section>
-        </>
+      {running ? (
+        <ol className="steps" aria-live="polite">
+          {steps.map(function (s, i) {
+            const state = i < stepNow ? "done" : i === stepNow ? "now" : "wait";
+            return (
+              <li key={i} className={state}>
+                <span className="st-dot">{state === "done" ? <Ico name="check" /> : null}</span>
+                <div><b>{s}</b></div>
+              </li>
+            );
+          })}
+        </ol>
       ) : null}
 
-      <details className="real">
-        <summary>Run it for real on Apify</summary>
-        <p>WorkDey runs on Apify. Copy your settings, open the Actor, paste them into its input and press Start. To repeat it, save the input as a task and add a schedule with <span className="cron">{(SCHEDULES.find(function (s) { return s.id === p.schedule; }) || SCHEDULES[1]).cron}</span>.</p>
-        <pre className="json">{json}</pre>
-        <div className="acts">
-          <CopyBtn text={json} label="settings" plain />
-          <a className="btn pink" href={ACTOR_URL} target="_blank" rel="noopener noreferrer">Open WorkDey on Apify</a>
-        </div>
-      </details>
+      {err ? <p className="err banner" role="alert">{err}</p> : null}
+      {note && !running ? <p className="okbanner" role="status">{note}</p> : null}
+
+      {list === null ? <p className="boot"><Spinner big /></p> : null}
+
+      {list && !running ? (
+        list.length === 0 ? (
+          <div className="panel" style={{ marginTop: 28 }}>
+            <h2>No matches yet</h2>
+            <p className="sub">Press Run agent now and WorkDey will search for jobs that fit your profile. Adding skills and a CV makes the matches better.</p>
+          </div>
+        ) : (
+          <>
+            <div className="rtop">
+              <h2>{list.length + (list.length === 1 ? " match" : " matches")}</h2>
+            </div>
+            <div className="rlayout">
+              <div className="side">
+                {list.map(function (m) {
+                  const on = cur && cur.id === m.id;
+                  const o = m.opportunity || {};
+                  return (
+                    <div key={m.id} className={"item" + (on ? " sel" : "")}>
+                      <button type="button" className="item-head" aria-pressed={on} onClick={function () { choose(m.id); }}>
+                        <span className="item-text">
+                          <span className="kicker">{(host(o.url) || "job") + (m.status === "new" ? " · new" : m.status === "applied" ? " · applied" : "")}</span>
+                          <span className="item-title">{o.title}</span>
+                          <span className="item-sub">{(o.company || "Company not stated") + (o.location ? " · " + o.location : "")}</span>
+                        </span>
+                        <span className="score-block"><b>{pct(m)}</b><span>FIT</span></span>
+                      </button>
+                      {on && !wide ? <Detail key={m.id} m={m} wide={false} drafts={drafts[m.id] || {}} onDraft={function (k, d) { setDrafts(function (o2) { return Object.assign({}, o2, { [m.id]: Object.assign({}, o2[m.id], { [k]: d }) }); }); }} onStatus={setStatus} onOpen={function () { opened(m); }} /> : null}
+                    </div>
+                  );
+                })}
+              </div>
+              {wide && cur ? <Detail key={cur.id} m={cur} wide={true} drafts={drafts[cur.id] || {}} onDraft={function (k, d) { setDrafts(function (o2) { return Object.assign({}, o2, { [cur.id]: Object.assign({}, o2[cur.id], { [k]: d }) }); }); }} onStatus={setStatus} onOpen={function () { opened(cur); }} /> : null}
+            </div>
+          </>
+        )
+      ) : null}
     </main>
   );
 }
 
 function App() {
   const route = useRoute();
-  const [user, setUser] = useState(function () { return load("workdey.user", null); });
-  function signIn(u) { save("workdey.user", u); setUser(u); go("#/profile"); }
-  function signOut() { try { localStorage.removeItem("workdey.user"); } catch (e) {} setUser(null); go("#/signin"); }
+  const [user, setUser] = useState(undefined); /* undefined while we check for a saved session */
+  const [state, setState] = useState(null);
 
+  async function refresh() {
+    try { const s = await api("/api/state"); setState(s); if (s.user) setUser(s.user); return s; }
+    catch (x) { if (x.status === 401) { setUser(null); setState(null); } return null; }
+  }
   useEffect(function () {
+    api("/api/auth/me").then(function (d) { if (d.user) { setUser(d.user); refresh(); } else setUser(null); }, function () { setUser(null); });
+  }, []);
+  useEffect(function () {
+    if (user === undefined) return;
+    const ok = route === "#/profile" || route === "#/matches";
     if (!user && route !== "#/signin") go("#/signin");
-    if (user && route !== "#/profile" && route !== "#/run") go("#/profile");
+    else if (user && !ok) go("#/matches");
   }, [user, route]);
 
-  return (
-    <>
-      <Bar user={user} onOut={signOut} />
-      {!user ? <SignIn onDone={signIn} /> : route === "#/run" ? <Run user={user} /> : <Profile user={user} />}
-    </>
-  );
+  function signedIn(u, isNew) { setUser(u); refresh().then(function () { go(isNew ? "#/profile" : "#/matches"); }); }
+  async function signOut() { try { await api("/api/auth/logout", { body: {} }); } catch (e) { /* cookie may already be gone */ } setUser(null); setState(null); go("#/signin"); }
+
+  let page;
+  if (user === undefined) page = <p className="boot"><Spinner big /></p>;
+  else if (!user) page = <SignIn onDone={signedIn} />;
+  else if (route === "#/profile") page = state ? <Profile state={state} onState={refresh} /> : <p className="boot"><Spinner big /></p>;
+  else page = <Matches user={user} />;
+  return (<><Bar user={user} onOut={signOut} />{page}</>);
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
