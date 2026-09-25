@@ -245,8 +245,7 @@ const { useState, useEffect, useRef } = React;
    the backend by vercel.json, so cookies stay same-site. Opened from a file or localhost, it calls
    the backend directly. Override with window.WORKDEY_API = "https://..." before this script. */
 const DIRECT_API = "https://workdey-prod-engine.onrender.com";
-const onRealHost = /^https?:$/.test(window.location.protocol) && !/^(localhost|127\.0\.0\.1)$/.test(window.location.hostname);
-const API_BASE = (window.WORKDEY_API !== undefined ? window.WORKDEY_API : (onRealHost ? "" : DIRECT_API)).replace(/\/+$/, "");
+const API_BASE = (window.WORKDEY_API !== undefined ? window.WORKDEY_API : DIRECT_API).replace(/\/+$/, "");
 
 const LOCATIONS = ["Lagos", "Remote", "Abuja", "Port Harcourt", "Ibadan"];
 const CADENCES = [
