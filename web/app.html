@@ -433,7 +433,10 @@ function Profile({ state, onState }) {
     const body = { name: p.name.trim() || undefined, skills_tags: p.skills, target_roles: p.roles, locations: p.locations, paid_only: p.paidOnly };
     if (years !== undefined && !isNaN(years)) body.years_experience = years;
     await api("/api/profile", { body });
-    await api("/api/watch", { body: { enabled: p.enabled, cadence_hours: p.cadence, email_on: p.emailOn, match_threshold: Math.min(0.85, Math.max(0.2, p.threshold / 100)) } });
+    const watch = { enabled: p.enabled, cadence_hours: p.cadence, email_on: p.emailOn };
+    /* Only send strictness when the person moved the slider, so we never overwrite the server's own value. */
+    if (p.thresholdTouched) watch.match_threshold = Math.min(0.85, Math.max(0.2, p.threshold / 100));
+    await api("/api/watch", { body: watch });
     onState();
   }
   async function save(then) {
@@ -542,13 +545,15 @@ function Profile({ state, onState }) {
             </div>
             <div className="sep">
               <div className="row"><label htmlFor="ms" className="lab" style={{ margin: 0 }}>Match strictness</label><span className="val">{p.threshold}</span></div>
-              <input id="ms" type="range" min="20" max="85" value={p.threshold} onChange={function (e) { set("threshold", Number(e.target.value)); }} />
+              <input id="ms" type="range" min="20" max="85" value={p.threshold} onChange={function (e) { set("threshold", Number(e.target.value)); set("thresholdTouched", true); }} />
               <p className="small" style={{ marginTop: 6 }}>Higher means fewer, closer matches.</p>
             </div>
             <label className="check sep">
               <input type="checkbox" checked={p.emailOn} onChange={function () { set("emailOn", !p.emailOn); }} />
               <span className="box" aria-hidden="true"></span>Email me new matches
             </label>
+            {state && state.keys && state.keys.brevo === false ? <p className="err" style={{ marginTop: 6 }}>The email service isn't set up on the server yet, so no emails can be sent.</p> : null}
+            {state && state.user && state.user.email ? <p className="small" style={{ marginTop: 6 }}>Sent to {state.user.email}. Check spam too.</p> : null}
           </div>
 
           <div className="actions">
@@ -745,7 +750,7 @@ function Matches({ user }) {
     try {
       const d = await api("/api/watch/run", { method: "POST", body: {}, timeout: 170000 });
       const n = d.matches || 0;
-      setNote(n ? n + (n === 1 ? " match found" : " matches found") + (d.mailed ? ", " + d.mailed + " emailed to you." : ".") : "No new matches this time. Try lowering the match strictness, or add skills.");
+      setNote(n ? n + (n === 1 ? " match found" : " matches found") + (d.mailed ? ", " + d.mailed + " emailed to you." : ". None were emailed: email may be switched off in your profile, or the server couldn't send it.") : "No new matches this time. Try lowering the match strictness, or add skills.");
       await load();
     } catch (x) { setErr(x.message); }
     setRunning(false);
@@ -795,7 +800,7 @@ function Matches({ user }) {
         </div>
         <div className="acts">
           <button type="button" className="btn" onClick={function () { go("#/profile"); }}>Edit profile</button>
-          <button type="button" className="btn pink" onClick={run} disabled={running}>{running ? <Spinner /> : null}{running ? "Running..." : "Run agent now"}</button>
+          <button type="button" className="btn pink" onClick={run} disabled={running}>{running ? <Spinner /> : null}{running ? "Searching..." : "Find jobs"}</button>
         </div>
       </div>
 
@@ -822,7 +827,7 @@ function Matches({ user }) {
         list.length === 0 ? (
           <div className="panel" style={{ marginTop: 28 }}>
             <h2>No matches yet</h2>
-            <p className="sub">Press Run agent now and WorkDey will search for jobs that fit your profile. Adding skills and a CV makes the matches better.</p>
+            <p className="sub">Press Find jobs and WorkDey will search for jobs that fit your profile. Adding skills and a CV makes the matches better.</p>
           </div>
         ) : (
           <>
